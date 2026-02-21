@@ -13,7 +13,7 @@ export function computeLeaveBalance(
   const months = getMonthsSinceHire(profile.hire_date);
   const accrual = Number(profile.monthly_accrual) || 1.5;
   const totalAccrued = months * accrual;
-  return Math.max(0, totalAccrued - approvedPaidLeaveDays);
+  return totalAccrued - approvedPaidLeaveDays;
 }
 
 /**
@@ -29,7 +29,7 @@ export function computeHolidayBalance(
   const months = getMonthsSinceHire(profile.hire_date);
   const accrual = Number(profile.monthly_holiday_accrual) || 1.08;
   const totalAccrued = months * accrual;
-  return Math.max(0, totalAccrued - approvedHolidayDays);
+  return totalAccrued - approvedHolidayDays;
 }
 
 function getMonthsSinceHire(hireDate: string): number {

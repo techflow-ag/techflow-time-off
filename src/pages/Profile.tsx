@@ -203,12 +203,12 @@ export default function Profile() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-sm text-muted-foreground">{t('paidLeave')}</p>
-              <p className="text-3xl font-bold text-foreground">{paidBalance.toFixed(2)}</p>
+              <p className={`text-3xl font-bold ${paidBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>{paidBalance.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">+{Number(profile.monthly_accrual).toFixed(2)} {t('daysPerMonth')}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('publicHoliday')}</p>
-              <p className="text-3xl font-bold text-foreground">{holidayBalance.toFixed(2)}</p>
+              <p className={`text-3xl font-bold ${holidayBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>{holidayBalance.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">+{Number(profile.monthly_holiday_accrual).toFixed(2)} {t('daysPerMonth')}</p>
             </div>
           </div>

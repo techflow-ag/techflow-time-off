@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Users, Clock, CalendarDays } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
-import { computeLeaveBalance } from '@/lib/leaveBalance';
+import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -16,18 +17,30 @@ type RequestWithProfile = Tables<'leave_requests'> & {
   profiles: Tables<'profiles'> | null;
 };
 
+function leaveTypeLabel(type: string, t: (k: string) => string) {
+  switch (type) {
+    case 'paid_leave': return t('paidLeave');
+    case 'public_holiday': return t('publicHoliday');
+    case 'sick_leave': return t('sickLeave');
+    case 'unpaid_leave': return t('unpaidLeave');
+    default: return t('other');
+  }
+}
+
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { t, language } = useLanguage();
   const { toast } = useToast();
-  const [requests, setRequests] = useState<RequestWithProfile[]>([]);
-  const [allRequests, setAllRequests] = useState<Tables<'leave_requests'>[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<RequestWithProfile[]>([]);
+  const [allRequests, setAllRequests] = useState<RequestWithProfile[]>([]);
+  const [approvedLeave, setApprovedLeave] = useState<Tables<'leave_requests'>[]>([]);
   const [profiles, setProfiles] = useState<Tables<'profiles'>[]>([]);
   const [comments, setComments] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const fetchData = async () => {
-    const [reqRes, allReqRes, profRes] = await Promise.all([
+    const [pendingRes, allReqRes, approvedRes, profRes] = await Promise.all([
       supabase
         .from('leave_requests')
         .select('*, profiles!leave_requests_employee_id_fkey(*)')
@@ -35,13 +48,17 @@ export default function AdminDashboard() {
         .order('created_at', { ascending: false }),
       supabase
         .from('leave_requests')
+        .select('*, profiles!leave_requests_employee_id_fkey(*)')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('leave_requests')
         .select('*')
-        .eq('status', 'approved')
-        .eq('type', 'paid_leave'),
+        .eq('status', 'approved'),
       supabase.from('profiles').select('*').eq('is_active', true),
     ]);
-    setRequests((reqRes.data as RequestWithProfile[]) || []);
-    setAllRequests(allReqRes.data || []);
+    setPendingRequests((pendingRes.data as RequestWithProfile[]) || []);
+    setAllRequests((allReqRes.data as RequestWithProfile[]) || []);
+    setApprovedLeave(approvedRes.data || []);
     setProfiles(profRes.data || []);
   };
 
@@ -51,7 +68,7 @@ export default function AdminDashboard() {
 
   const today = new Date().toISOString().split('T')[0];
   const onLeaveToday = profiles.filter((p) =>
-    requests.some(
+    allRequests.some(
       (r) =>
         r.employee_id === p.id &&
         r.status === 'approved' &&
@@ -59,13 +76,6 @@ export default function AdminDashboard() {
         r.end_date >= today
     )
   ).length;
-
-  // Compute balance for a profile
-  const getEmployeeApprovedDays = (profileId: string) => {
-    return allRequests
-      .filter((r) => r.employee_id === profileId)
-      .reduce((sum, r) => sum + Number(r.number_of_days), 0);
-  };
 
   const handleDecision = async (requestId: string, status: 'approved' | 'rejected') => {
     setProcessing(requestId);
@@ -91,11 +101,13 @@ export default function AdminDashboard() {
     setProcessing(null);
   };
 
+  const filteredAll = statusFilter === 'all' ? allRequests : allRequests.filter((r) => r.status === statusFilter);
+
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-foreground">{t('dashboard')}</h1>
 
-      {/* Stats - removed nonsensical total balance card */}
+      {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -113,7 +125,7 @@ export default function AdminDashboard() {
             <Clock className="h-5 w-5 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{requests.length}</div>
+            <div className="text-3xl font-bold text-foreground">{pendingRequests.length}</div>
           </CardContent>
         </Card>
 
@@ -129,63 +141,119 @@ export default function AdminDashboard() {
       </div>
 
       {/* Pending requests */}
+      {pendingRequests.length > 0 && (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>{t('pendingRequests')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {pendingRequests.map((r) => (
+              <div key={r.id} className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {r.profiles?.first_name} {r.profiles?.last_name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDate(r.start_date, language)} → {formatDate(r.end_date, language)} · {r.number_of_days} {t('days')}
+                    </p>
+                    <Badge variant="warning" className="mt-1">
+                      {leaveTypeLabel(r.type, t)}
+                    </Badge>
+                    {r.reason && (
+                      <p className="text-sm text-muted-foreground mt-1">{r.reason}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="success"
+                      size="sm"
+                      disabled={processing === r.id}
+                      onClick={() => handleDecision(r.id, 'approved')}
+                    >
+                      {t('approve')}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={processing === r.id}
+                      onClick={() => handleDecision(r.id, 'rejected')}
+                    >
+                      {t('reject')}
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  placeholder={t('commentPlaceholder')}
+                  value={comments[r.id] || ''}
+                  onChange={(e) => setComments((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                  className="text-sm"
+                  rows={2}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* All requests (merged Leave Requests tab) */}
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>{t('pendingRequests')}</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <CardTitle>{t('leaveHistory')}</CardTitle>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder={t('filterByStatus')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('all')}</SelectItem>
+                <SelectItem value="pending">{t('pending')}</SelectItem>
+                <SelectItem value="approved">{t('approved')}</SelectItem>
+                <SelectItem value="rejected">{t('rejected')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {requests.length === 0 ? (
-            <p className="text-muted-foreground py-8 text-center">{t('noRequests')}</p>
+        <CardContent className="p-0">
+          {filteredAll.length === 0 ? (
+            <p className="text-muted-foreground py-12 text-center">{t('noRequests')}</p>
           ) : (
-            requests.map((r) => {
-              const empApprovedDays = getEmployeeApprovedDays(r.employee_id);
-              const empBalance = r.profiles ? computeLeaveBalance(r.profiles, empApprovedDays) : 0;
-              return (
-                <div key={r.id} className="rounded-lg border border-border p-4 space-y-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-foreground">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('employee')}</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('requestDate')}</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('leaveDates')}</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('days')}</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('type')}</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('status')}</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('adminComment')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAll.map((r) => (
+                    <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 text-foreground font-medium">
                         {r.profiles?.first_name} {r.profiles?.last_name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(r.start_date, language)} → {formatDate(r.end_date, language)} · {r.number_of_days} {t('days')}
-                      </p>
-                      <Badge variant="warning" className="mt-1">
-                        {t(r.type === 'paid_leave' ? 'paidLeave' : r.type === 'sick_leave' ? 'sickLeave' : r.type === 'unpaid_leave' ? 'unpaidLeave' : 'other')}
-                      </Badge>
-                      {r.reason && (
-                        <p className="text-sm text-muted-foreground mt-1">{r.reason}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="success"
-                        size="sm"
-                        disabled={processing === r.id}
-                        onClick={() => handleDecision(r.id, 'approved')}
-                      >
-                        {t('approve')}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={processing === r.id}
-                        onClick={() => handleDecision(r.id, 'rejected')}
-                      >
-                        {t('reject')}
-                      </Button>
-                    </div>
-                  </div>
-                  <Textarea
-                    placeholder={t('commentPlaceholder')}
-                    value={comments[r.id] || ''}
-                    onChange={(e) => setComments((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                    className="text-sm"
-                    rows={2}
-                  />
-                </div>
-              );
-            })
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatDate(r.created_at, language)}</td>
+                      <td className="px-4 py-3 text-foreground">
+                        {formatDate(r.start_date, language)} → {formatDate(r.end_date, language)}
+                      </td>
+                      <td className="px-4 py-3 text-foreground">{r.number_of_days}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{leaveTypeLabel(r.type, t)}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'destructive' : 'warning'}>
+                          {t(r.status)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{r.admin_comment || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>

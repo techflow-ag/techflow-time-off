@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { userId, email, hireDate } = await req.json();
+    const { userId, email, hireDate, monthlyAccrual } = await req.json();
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "Missing userId" }), {
@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
     const updates: Record<string, unknown> = {};
     if (email) updates.email = email;
     if (hireDate !== undefined) updates.hire_date = hireDate || null;
+    if (monthlyAccrual !== undefined) updates.monthly_accrual = monthlyAccrual;
 
     if (Object.keys(updates).length > 0) {
       const { error: profileError } = await adminClient

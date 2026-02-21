@@ -19,14 +19,14 @@ export default function EmployeeManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Tables<'profiles'> | null>(null);
-  const [editForm, setEditForm] = useState({ email: '', hireDate: '' });
+  const [editForm, setEditForm] = useState({ email: '', hireDate: '', monthlyAccrual: '2.08' });
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
     email: '',
     hireDate: '',
-    initialBalance: '25',
+    initialBalance: '0',
   });
   const [inviting, setInviting] = useState(false);
 
@@ -50,7 +50,7 @@ export default function EmployeeManagement() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         hireDate: form.hireDate || null,
-        initialBalance: parseFloat(form.initialBalance) || 25,
+        initialBalance: parseFloat(form.initialBalance) || 0,
       },
     });
 
@@ -62,7 +62,7 @@ export default function EmployeeManagement() {
         description: language === 'fr' ? 'Invitation envoyée par email' : 'Invitation email sent',
       });
       setDialogOpen(false);
-      setForm({ firstName: '', lastName: '', email: '', hireDate: '', initialBalance: '25' });
+      setForm({ firstName: '', lastName: '', email: '', hireDate: '', initialBalance: '0' });
       fetchProfiles();
     }
     setInviting(false);
@@ -70,7 +70,7 @@ export default function EmployeeManagement() {
 
   const openEdit = (profile: Tables<'profiles'>) => {
     setEditingProfile(profile);
-    setEditForm({ email: profile.email, hireDate: profile.hire_date || '' });
+    setEditForm({ email: profile.email, hireDate: profile.hire_date || '', monthlyAccrual: String(profile.monthly_accrual ?? 2.08) });
     setEditDialogOpen(true);
   };
 
@@ -84,6 +84,7 @@ export default function EmployeeManagement() {
         userId: editingProfile.id,
         email: editForm.email.trim(),
         hireDate: editForm.hireDate || null,
+        monthlyAccrual: parseFloat(editForm.monthlyAccrual) || 2.08,
       },
     });
 
@@ -199,6 +200,16 @@ export default function EmployeeManagement() {
                 onChange={(e) => setEditForm((f) => ({ ...f, hireDate: e.target.value }))}
               />
             </div>
+            <div className="space-y-2">
+              <Label>{t('monthlyAccrual')} ({t('daysPerMonth')})</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={editForm.monthlyAccrual}
+                onChange={(e) => setEditForm((f) => ({ ...f, monthlyAccrual: e.target.value }))}
+              />
+            </div>
             <div className="flex gap-2">
               <Button type="button" variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>
                 {t('cancel')}
@@ -235,7 +246,7 @@ export default function EmployeeManagement() {
                     <td className="px-4 py-3 text-muted-foreground">
                       {p.hire_date ? formatDate(p.hire_date, language) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-foreground font-medium">{p.leave_balance}</td>
+                    <td className="px-4 py-3 text-foreground font-medium">{Number(p.leave_balance).toFixed(2)}</td>
                     <td className="px-4 py-3">
                       <Badge variant={p.is_active ? 'success' : 'secondary'}>
                         {p.is_active ? t('active') : t('inactive')}

@@ -56,7 +56,7 @@ export default function EmployeeDashboard() {
             <TrendingUp className="h-5 w-5 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{balance}</div>
+            <div className="text-3xl font-bold text-foreground">{Number(balance).toFixed(2)}</div>
             <p className="text-sm text-muted-foreground">{t('daysRemaining')}</p>
             <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
               <div

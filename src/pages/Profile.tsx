@@ -17,6 +17,11 @@ export default function Profile() {
   const [lastName, setLastName] = useState(profile?.last_name || '');
   const [saving, setSaving] = useState(false);
 
+  // Password change state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
@@ -34,6 +39,28 @@ export default function Profile() {
       setEditing(false);
     }
     setSaving(false);
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast({ title: 'Error', description: language === 'fr' ? 'Le mot de passe doit contenir au moins 6 caractères' : 'Password must be at least 6 characters', variant: 'destructive' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: 'Error', description: language === 'fr' ? 'Les mots de passe ne correspondent pas' : 'Passwords do not match', variant: 'destructive' });
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: language === 'fr' ? 'Mot de passe modifié' : 'Password updated' });
+      setNewPassword('');
+      setConfirmPassword('');
+    }
+    setChangingPassword(false);
   };
 
   if (!profile) return null;
@@ -107,15 +134,49 @@ export default function Profile() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-sm text-muted-foreground">{t('currentBalance')}</p>
-              <p className="text-3xl font-bold text-foreground">{profile.leave_balance}</p>
+              <p className="text-3xl font-bold text-foreground">{Number(profile.leave_balance).toFixed(2)}</p>
               <p className="text-sm text-muted-foreground">{t('daysRemaining')}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('monthlyAccrual')}</p>
-              <p className="text-xl font-semibold text-foreground">+{profile.monthly_accrual}</p>
+              <p className="text-xl font-semibold text-foreground">+{Number(profile.monthly_accrual).toFixed(2)}</p>
               <p className="text-sm text-muted-foreground">{t('daysPerMonth')}</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Password change card */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>{language === 'fr' ? 'Changer le mot de passe' : 'Change Password'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div className="space-y-2">
+              <Label>{language === 'fr' ? 'Nouveau mot de passe' : 'New Password'}</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{language === 'fr' ? 'Confirmer le mot de passe' : 'Confirm Password'}</Label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+            <Button type="submit" disabled={changingPassword}>
+              {changingPassword ? '...' : (language === 'fr' ? 'Mettre à jour' : 'Update Password')}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>

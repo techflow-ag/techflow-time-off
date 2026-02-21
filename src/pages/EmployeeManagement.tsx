@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Pencil } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
@@ -17,6 +17,10 @@ export default function EmployeeManagement() {
   const { toast } = useToast();
   const [profiles, setProfiles] = useState<Tables<'profiles'>[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<Tables<'profiles'> | null>(null);
+  const [editForm, setEditForm] = useState({ email: '', hireDate: '' });
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -62,6 +66,37 @@ export default function EmployeeManagement() {
       fetchProfiles();
     }
     setInviting(false);
+  };
+
+  const openEdit = (profile: Tables<'profiles'>) => {
+    setEditingProfile(profile);
+    setEditForm({ email: profile.email, hireDate: profile.hire_date || '' });
+    setEditDialogOpen(true);
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProfile) return;
+    setSaving(true);
+
+    const { data, error } = await supabase.functions.invoke('update-employee', {
+      body: {
+        userId: editingProfile.id,
+        email: editForm.email.trim(),
+        hireDate: editForm.hireDate || null,
+      },
+    });
+
+    if (error || data?.error) {
+      toast({ title: 'Error', description: data?.error || error?.message, variant: 'destructive' });
+    } else {
+      toast({
+        title: language === 'fr' ? 'Employé modifié' : 'Employee updated',
+      });
+      setEditDialogOpen(false);
+      fetchProfiles();
+    }
+    setSaving(false);
   };
 
   const toggleActive = async (profile: Tables<'profiles'>) => {
@@ -140,6 +175,42 @@ export default function EmployeeManagement() {
         </Dialog>
       </div>
 
+      {/* Edit Employee Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('editEmployee')}{editingProfile ? ` — ${editingProfile.first_name} ${editingProfile.last_name}` : ''}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEdit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>{t('email')}</Label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('hireDate')}</Label>
+              <Input
+                type="date"
+                value={editForm.hireDate}
+                onChange={(e) => setEditForm((f) => ({ ...f, hireDate: e.target.value }))}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>
+                {t('cancel')}
+              </Button>
+              <Button type="submit" className="flex-1" disabled={saving}>
+                {saving ? '...' : t('save')}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <Card className="shadow-sm">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -171,9 +242,14 @@ export default function EmployeeManagement() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <Button variant="ghost" size="sm" onClick={() => toggleActive(p)}>
-                        {p.is_active ? t('deactivate') : t('activate')}
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => toggleActive(p)}>
+                          {p.is_active ? t('deactivate') : t('activate')}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -76,6 +76,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           email: string
           first_name: string
@@ -88,6 +89,7 @@ export type Database = {
           monthly_holiday_accrual: number
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           email?: string
           first_name?: string
@@ -100,6 +102,7 @@ export type Database = {
           monthly_holiday_accrual?: number
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           email?: string
           first_name?: string
@@ -146,7 +149,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "employee"
-      leave_status: "pending" | "approved" | "rejected"
+      leave_status: "pending" | "approved" | "rejected" | "cancelled"
       leave_type:
         | "paid_leave"
         | "sick_leave"
@@ -281,7 +284,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "employee"],
-      leave_status: ["pending", "approved", "rejected"],
+      leave_status: ["pending", "approved", "rejected", "cancelled"],
       leave_type: [
         "paid_leave",
         "sick_leave",

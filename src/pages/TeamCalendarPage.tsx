@@ -52,7 +52,6 @@ export default function TeamCalendarPage() {
     ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
     : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // Build calendar grid
   const calendarDays: (number | null)[] = [];
   const adjustedFirstDay = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
   for (let i = 0; i < adjustedFirstDay; i++) calendarDays.push(null);
@@ -74,7 +73,7 @@ export default function TeamCalendarPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">{t('teamCalendar')}</h1>
+      <h1 className="text-2xl font-bold text-foreground">{t('teamVacationCalendar')}</h1>
 
       <Card className="shadow-sm">
         <CardHeader>

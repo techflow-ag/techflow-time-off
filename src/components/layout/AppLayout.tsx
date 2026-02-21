@@ -14,6 +14,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import techflowLogo from '@/assets/TechFlow_Logo.png';
@@ -39,7 +40,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const adminLinks = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard') },
-    { to: '/team-calendar', icon: CalendarDays, label: t('teamCalendar') },
+    { to: '/team-calendar', icon: CalendarDays, label: t('teamVacationCalendar') },
     { to: '/employees', icon: Users, label: t('employees') },
     { to: '/profile', icon: User, label: t('myProfile') },
   ];
@@ -108,11 +109,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {language === 'en' ? 'Français' : 'English'}
           </button>
 
-          {/* User info */}
+          {/* User info with avatar */}
           {displayName && (
-            <div className="px-3 py-2">
-              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
-              <p className="text-xs text-muted-foreground capitalize">{role}</p>
+            <div className="flex items-center gap-3 px-3 py-2">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={profile?.avatar_url || undefined} />
+                <AvatarFallback className="text-xs">
+                  {profile?.first_name?.[0]}{profile?.last_name?.[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+                <p className="text-xs text-muted-foreground capitalize">{role}</p>
+              </div>
             </div>
           )}
 

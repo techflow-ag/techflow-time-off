@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { UserPlus, Pencil, Trash2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
-import { computeLeaveBalance } from '@/lib/leaveBalance';
+import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -18,11 +19,13 @@ export default function EmployeeManagement() {
   const { t, language } = useLanguage();
   const { toast } = useToast();
   const [profiles, setProfiles] = useState<Tables<'profiles'>[]>([]);
-  const [approvedDaysMap, setApprovedDaysMap] = useState<Record<string, number>>({});
+  const [approvedPaidMap, setApprovedPaidMap] = useState<Record<string, number>>({});
+  const [approvedHolidayMap, setApprovedHolidayMap] = useState<Record<string, number>>({});
+  const [totalLeaveTaken, setTotalLeaveTaken] = useState<Record<string, number>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Tables<'profiles'> | null>(null);
-  const [editForm, setEditForm] = useState({ email: '', hireDate: '', monthlyAccrual: '2.08' });
+  const [editForm, setEditForm] = useState({ email: '', hireDate: '', monthlyAccrual: '1.5', monthlyHolidayAccrual: '1.08' });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Tables<'profiles'> | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -38,15 +41,27 @@ export default function EmployeeManagement() {
   const fetchProfiles = async () => {
     const [profRes, leaveRes] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-      supabase.from('leave_requests').select('employee_id, number_of_days').eq('status', 'approved').eq('type', 'paid_leave'),
+      supabase.from('leave_requests').select('employee_id, number_of_days, type, status'),
     ]);
     setProfiles(profRes.data || []);
     
-    const map: Record<string, number> = {};
+    const paidMap: Record<string, number> = {};
+    const holidayMap: Record<string, number> = {};
+    const totalMap: Record<string, number> = {};
     (leaveRes.data || []).forEach((r) => {
-      map[r.employee_id] = (map[r.employee_id] || 0) + Number(r.number_of_days);
+      if (r.status === 'approved') {
+        if (r.type === 'paid_leave') {
+          paidMap[r.employee_id] = (paidMap[r.employee_id] || 0) + Number(r.number_of_days);
+        }
+        if (r.type === 'public_holiday') {
+          holidayMap[r.employee_id] = (holidayMap[r.employee_id] || 0) + Number(r.number_of_days);
+        }
+        totalMap[r.employee_id] = (totalMap[r.employee_id] || 0) + Number(r.number_of_days);
+      }
     });
-    setApprovedDaysMap(map);
+    setApprovedPaidMap(paidMap);
+    setApprovedHolidayMap(holidayMap);
+    setTotalLeaveTaken(totalMap);
   };
 
   useEffect(() => {
@@ -84,7 +99,12 @@ export default function EmployeeManagement() {
 
   const openEdit = (profile: Tables<'profiles'>) => {
     setEditingProfile(profile);
-    setEditForm({ email: profile.email, hireDate: profile.hire_date || '', monthlyAccrual: String(profile.monthly_accrual ?? 2.08) });
+    setEditForm({
+      email: profile.email,
+      hireDate: profile.hire_date || '',
+      monthlyAccrual: String(profile.monthly_accrual ?? 1.5),
+      monthlyHolidayAccrual: String(profile.monthly_holiday_accrual ?? 1.08),
+    });
     setEditDialogOpen(true);
   };
 
@@ -98,7 +118,8 @@ export default function EmployeeManagement() {
         userId: editingProfile.id,
         email: editForm.email.trim(),
         hireDate: editForm.hireDate || null,
-        monthlyAccrual: parseFloat(editForm.monthlyAccrual) || 2.08,
+        monthlyAccrual: parseFloat(editForm.monthlyAccrual) || 1.5,
+        monthlyHolidayAccrual: parseFloat(editForm.monthlyHolidayAccrual) || 1.08,
       },
     });
 
@@ -194,8 +215,12 @@ export default function EmployeeManagement() {
               <Input type="date" value={editForm.hireDate} onChange={(e) => setEditForm((f) => ({ ...f, hireDate: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label>{t('monthlyAccrual')} ({t('daysPerMonth')})</Label>
+              <Label>{t('paidLeave')} — {t('monthlyAccrual')} ({t('daysPerMonth')})</Label>
               <Input type="number" step="0.01" min="0" value={editForm.monthlyAccrual} onChange={(e) => setEditForm((f) => ({ ...f, monthlyAccrual: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('publicHoliday')} — {t('monthlyAccrual')} ({t('daysPerMonth')})</Label>
+              <Input type="number" step="0.01" min="0" value={editForm.monthlyHolidayAccrual} onChange={(e) => setEditForm((f) => ({ ...f, monthlyHolidayAccrual: e.target.value }))} />
             </div>
             <div className="flex gap-2">
               <Button type="button" variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>{t('cancel')}</Button>
@@ -234,26 +259,42 @@ export default function EmployeeManagement() {
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('employee')}</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('email')}</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('hireDate')}</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('leaveBalance')}</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('monthlyAccrual')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('paidLeave')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('publicHoliday')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{language === 'fr' ? 'Total congés pris' : 'Total Leave Taken'}</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('status')}</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground"></th>
                 </tr>
               </thead>
               <tbody>
                 {profiles.map((p) => {
-                  const balance = computeLeaveBalance(p, approvedDaysMap[p.id] || 0);
+                  const paidBalance = computeLeaveBalance(p, approvedPaidMap[p.id] || 0);
+                  const holidayBal = computeHolidayBalance(p, approvedHolidayMap[p.id] || 0);
+                  const totalTaken = totalLeaveTaken[p.id] || 0;
                   return (
                     <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">
-                        {p.first_name} {p.last_name}
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-7 w-7">
+                            <AvatarImage src={p.avatar_url || undefined} />
+                            <AvatarFallback className="text-[10px]">
+                              {p.first_name?.[0]}{p.last_name?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          {p.first_name} {p.last_name}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{p.email}</td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {p.hire_date ? formatDate(p.hire_date, language) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-foreground font-medium">{balance.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{Number(p.monthly_accrual).toFixed(2)}</td>
+                      <td className={`px-4 py-3 font-medium ${paidBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                        {paidBalance.toFixed(2)}
+                      </td>
+                      <td className={`px-4 py-3 font-medium ${holidayBal < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                        {holidayBal.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-foreground font-medium">{totalTaken.toFixed(1)}</td>
                       <td className="px-4 py-3">
                         <Badge variant={p.is_active ? 'success' : 'secondary'}>
                           {p.is_active ? t('active') : t('inactive')}

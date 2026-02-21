@@ -50,11 +50,45 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { userId, email, hireDate, monthlyAccrual } = await req.json();
+    const { userId, email, hireDate, monthlyAccrual, action } = await req.json();
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "Missing userId" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle delete action
+    if (action === "delete") {
+      // Verify user is deactivated first
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("is_active")
+        .eq("id", userId)
+        .single();
+
+      if (profile?.is_active) {
+        return new Response(JSON.stringify({ error: "User must be deactivated before deletion" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Delete leave requests, user_roles, profile, then auth user
+      await adminClient.from("leave_requests").delete().eq("employee_id", userId);
+      await adminClient.from("user_roles").delete().eq("user_id", userId);
+      await adminClient.from("profiles").delete().eq("id", userId);
+      const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId);
+      if (authDeleteError) {
+        return new Response(JSON.stringify({ error: authDeleteError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

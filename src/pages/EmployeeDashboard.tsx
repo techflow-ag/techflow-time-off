@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CalendarDays, Clock, TrendingUp } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { computeLeaveBalance } from '@/lib/leaveBalance';
 import type { Tables } from '@/integrations/supabase/types';
 
 export default function EmployeeDashboard() {
@@ -28,7 +29,11 @@ export default function EmployeeDashboard() {
     (r) => r.status === 'approved' && new Date(r.start_date) >= new Date()
   );
 
-  const balance = profile?.leave_balance ?? 0;
+  const approvedPaidDays = requests
+    .filter((r) => r.status === 'approved' && r.type === 'paid_leave')
+    .reduce((sum, r) => sum + Number(r.number_of_days), 0);
+
+  const balance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
   const maxBalance = 25;
   const balancePercent = Math.min((balance / maxBalance) * 100, 100);
 
@@ -56,7 +61,7 @@ export default function EmployeeDashboard() {
             <TrendingUp className="h-5 w-5 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{Number(balance).toFixed(2)}</div>
+            <div className="text-3xl font-bold text-foreground">{balance.toFixed(2)}</div>
             <p className="text-sm text-muted-foreground">{t('daysRemaining')}</p>
             <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
               <div

@@ -2,11 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import AppLayout from "@/components/layout/AppLayout";
 import Login from "@/pages/Login";
+import SetPassword from "@/pages/SetPassword";
 import EmployeeDashboard from "@/pages/EmployeeDashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
 import NewRequest from "@/pages/NewRequest";
@@ -20,6 +21,11 @@ const queryClient = new QueryClient();
 
 function AppRoutes() {
   const { user, role, loading } = useAuth();
+  const location = useLocation();
+
+  // Check if this is an invite/recovery token flow
+  const hash = location.hash;
+  const isRecoveryFlow = hash.includes('type=recovery') || hash.includes('type=invite') || hash.includes('type=signup');
 
   if (loading) {
     return (
@@ -29,6 +35,15 @@ function AppRoutes() {
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
+    );
+  }
+
+  // If we have a recovery/invite token, show set-password page
+  if (isRecoveryFlow) {
+    return (
+      <Routes>
+        <Route path="*" element={<SetPassword />} />
+      </Routes>
     );
   }
 

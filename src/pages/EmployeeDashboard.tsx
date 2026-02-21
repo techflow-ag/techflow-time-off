@@ -64,7 +64,7 @@ export default function EmployeeDashboard() {
             <TrendingUp className="h-5 w-5 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{paidBalance.toFixed(2)}</div>
+            <div className={`text-3xl font-bold ${paidBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>{paidBalance.toFixed(2)}</div>
             <p className="text-sm text-muted-foreground">{t('daysRemaining')}</p>
             {profile?.monthly_accrual && (
               <p className="mt-2 text-xs text-muted-foreground">
@@ -83,7 +83,7 @@ export default function EmployeeDashboard() {
             <Landmark className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{holidayBalance.toFixed(2)}</div>
+            <div className={`text-3xl font-bold ${holidayBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>{holidayBalance.toFixed(2)}</div>
             <p className="text-sm text-muted-foreground">{t('daysRemaining')}</p>
             {profile?.monthly_holiday_accrual && (
               <p className="mt-2 text-xs text-muted-foreground">

@@ -173,8 +173,12 @@ export default function NewRequest() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="paid_leave">{t('paidLeave')}</SelectItem>
-                  <SelectItem value="public_holiday">{t('publicHoliday')}</SelectItem>
+                  <SelectItem value="paid_leave">
+                    {t('paidLeave')} — <span className={paidBalance < 0 ? 'text-destructive' : ''}>{paidBalance.toFixed(2)} {t('daysRemaining')}</span>
+                  </SelectItem>
+                  <SelectItem value="public_holiday">
+                    {t('publicHoliday')} — <span className={holidayBalance < 0 ? 'text-destructive' : ''}>{holidayBalance.toFixed(2)} {t('daysRemaining')}</span>
+                  </SelectItem>
                   <SelectItem value="sick_leave">{t('sickLeave')}</SelectItem>
                   <SelectItem value="unpaid_leave">{t('unpaidLeave')}</SelectItem>
                   <SelectItem value="other">{t('other')}</SelectItem>

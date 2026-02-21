@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon, AlertTriangle } from 'lucide-react';
 import { calculateBusinessDays, cn, formatDate } from '@/lib/utils';
+import { computeLeaveBalance } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -28,9 +29,25 @@ export default function NewRequest() {
   const [leaveType, setLeaveType] = useState<LeaveType>('paid_leave');
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
+  const [approvedPaidDays, setApprovedPaidDays] = useState(0);
 
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('leave_requests')
+      .select('number_of_days')
+      .eq('employee_id', user.id)
+      .eq('status', 'approved')
+      .eq('type', 'paid_leave')
+      .then(({ data }) => {
+        const total = (data || []).reduce((sum, r) => sum + Number(r.number_of_days), 0);
+        setApprovedPaidDays(total);
+      });
+  }, [user]);
+
+  const balance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
   const businessDays = startDate && endDate ? calculateBusinessDays(startDate, endDate) : 0;
-  const exceedsBalance = leaveType === 'paid_leave' && businessDays > (profile?.leave_balance ?? 0);
+  const exceedsBalance = leaveType === 'paid_leave' && businessDays > balance;
   const isPastDate = startDate && startDate < new Date(new Date().toDateString());
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,7 +161,7 @@ export default function NewRequest() {
             {exceedsBalance && (
               <div className="flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm text-warning">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                {t('balanceWarning')} ({profile?.leave_balance} {t('daysRemaining')})
+                {t('balanceWarning')} ({balance.toFixed(2)} {t('daysRemaining')})
               </div>
             )}
 

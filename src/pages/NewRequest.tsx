@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { CalendarIcon, AlertTriangle } from 'lucide-react';
 import { calculateBusinessDays, cn, formatDate } from '@/lib/utils';
 import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
@@ -31,6 +32,7 @@ export default function NewRequest() {
   const [loading, setLoading] = useState(false);
   const [approvedPaidDays, setApprovedPaidDays] = useState(0);
   const [approvedHolidayDays, setApprovedHolidayDays] = useState(0);
+  const [showNegativeWarning, setShowNegativeWarning] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -53,10 +55,10 @@ export default function NewRequest() {
   const businessDays = startDate && endDate ? calculateBusinessDays(startDate, endDate) : 0;
 
   const currentBalance = leaveType === 'paid_leave' ? paidBalance : leaveType === 'public_holiday' ? holidayBalance : null;
-  const exceedsBalance = currentBalance !== null && businessDays > currentBalance;
+  const willBeNegative = currentBalance !== null && (currentBalance - businessDays) < 0;
+  const newBalance = currentBalance !== null ? currentBalance - businessDays : null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const doSubmit = async () => {
     if (!user || !startDate || !endDate || businessDays <= 0) return;
 
     setLoading(true);
@@ -81,9 +83,44 @@ export default function NewRequest() {
     setLoading(false);
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !startDate || !endDate || businessDays <= 0) return;
+
+    if (willBeNegative) {
+      setShowNegativeWarning(true);
+      return;
+    }
+
+    doSubmit();
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-foreground">{t('newRequest')}</h1>
+
+      {/* Negative balance warning dialog */}
+      <AlertDialog open={showNegativeWarning} onOpenChange={setShowNegativeWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              {language === 'fr' ? 'Solde négatif' : 'Negative Balance Warning'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === 'fr'
+                ? `Cette demande rendra votre solde négatif (${newBalance?.toFixed(2)} jours). Votre solde sera rétabli au fur et à mesure de vos cumuls mensuels.`
+                : `This request will make your balance negative (${newBalance?.toFixed(2)} days). Your balance will recover as you accrue leave in the coming months.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={doSubmit}>
+              {language === 'fr' ? "J'ai compris" : 'I understand'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card className="shadow-sm">
         <CardHeader>
@@ -158,10 +195,12 @@ export default function NewRequest() {
             )}
 
             {/* Balance warning */}
-            {exceedsBalance && (
-              <div className="flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm text-warning">
+            {willBeNegative && businessDays > 0 && (
+              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                {t('balanceWarning')} ({currentBalance!.toFixed(2)} {t('daysRemaining')})
+                {language === 'fr'
+                  ? `Attention : votre solde sera négatif (${newBalance?.toFixed(2)} jours)`
+                  : `Warning: your balance will be negative (${newBalance?.toFixed(2)} days)`}
               </div>
             )}
 

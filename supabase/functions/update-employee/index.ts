@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { userId, email, hireDate, monthlyAccrual, action } = await req.json();
+    const { userId, email, hireDate, monthlyAccrual, monthlyHolidayAccrual, action } = await req.json();
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "Missing userId" }), {
@@ -61,7 +61,6 @@ Deno.serve(async (req) => {
 
     // Handle delete action
     if (action === "delete") {
-      // Verify user is deactivated first
       const { data: profile } = await adminClient
         .from("profiles")
         .select("is_active")
@@ -75,7 +74,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Delete leave requests, user_roles, profile, then auth user
       await adminClient.from("leave_requests").delete().eq("employee_id", userId);
       await adminClient.from("user_roles").delete().eq("user_id", userId);
       await adminClient.from("profiles").delete().eq("id", userId);
@@ -112,6 +110,7 @@ Deno.serve(async (req) => {
     if (email) updates.email = email;
     if (hireDate !== undefined) updates.hire_date = hireDate || null;
     if (monthlyAccrual !== undefined) updates.monthly_accrual = monthlyAccrual;
+    if (monthlyHolidayAccrual !== undefined) updates.monthly_holiday_accrual = monthlyHolidayAccrual;
 
     if (Object.keys(updates).length > 0) {
       const { error: profileError } = await adminClient

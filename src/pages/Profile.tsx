@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import { formatDate } from '@/lib/utils';
@@ -15,11 +17,14 @@ export default function Profile() {
   const { profile, user } = useAuth();
   const { t, language } = useLanguage();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState(profile?.first_name || '');
   const [lastName, setLastName] = useState(profile?.last_name || '');
   const [emailField, setEmailField] = useState(profile?.email || '');
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -50,11 +55,41 @@ export default function Profile() {
       setFirstName(profile.first_name || '');
       setLastName(profile.last_name || '');
       setEmailField(profile.email || '');
+      setAvatarUrl(profile.avatar_url || null);
     }
   }, [profile]);
 
   const paidBalance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
   const holidayBalance = profile ? computeHolidayBalance(profile, approvedHolidayDays) : 0;
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploadingAvatar(true);
+    const filePath = `${user.id}/avatar.${file.name.split('.').pop()}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      toast({ title: 'Error', description: uploadError.message, variant: 'destructive' });
+      setUploadingAvatar(false);
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    const url = `${publicUrl}?v=${Date.now()}`;
+
+    await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id);
+    setAvatarUrl(url);
+    toast({ title: language === 'fr' ? 'Photo mise à jour' : 'Photo updated' });
+    setUploadingAvatar(false);
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -134,6 +169,7 @@ export default function Profile() {
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-foreground">{t('myProfile')}</h1>
 
+      {/* Avatar & Personal Info */}
       <Card className="shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -146,6 +182,37 @@ export default function Profile() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Avatar upload */}
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={avatarUrl || undefined} />
+                <AvatarFallback className="text-lg">
+                  {profile.first_name?.[0]}{profile.last_name?.[0]}
+                </AvatarFallback>
+              </Avatar>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              >
+                <Camera className="h-5 w-5 text-background" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">{profile.first_name} {profile.last_name}</p>
+              <p className="text-sm text-muted-foreground">{profile.email}</p>
+              {uploadingAvatar && <p className="text-xs text-muted-foreground">{language === 'fr' ? 'Envoi...' : 'Uploading...'}</p>}
+            </div>
+          </div>
+
           {editing ? (
             <>
               <div className="grid grid-cols-2 gap-4">

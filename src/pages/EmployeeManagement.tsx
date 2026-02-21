@@ -40,36 +40,22 @@ export default function EmployeeManagement() {
     if (!form.email.trim() || !form.firstName.trim() || !form.lastName.trim()) return;
     setInviting(true);
 
-    // Use Supabase admin invite (via edge function in production)
-    // For now, create user with signUp and metadata
-    const { data, error } = await supabase.auth.signUp({
-      email: form.email.trim(),
-      password: crypto.randomUUID(), // temp password, user will set via invite link
-      options: {
-        data: {
-          first_name: form.firstName.trim(),
-          last_name: form.lastName.trim(),
-        },
+    const { data, error } = await supabase.functions.invoke('invite-employee', {
+      body: {
+        email: form.email.trim(),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        hireDate: form.hireDate || null,
+        initialBalance: parseFloat(form.initialBalance) || 25,
       },
     });
 
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else if (data.user) {
-      // Update profile with additional info
-      await supabase
-        .from('profiles')
-        .update({
-          hire_date: form.hireDate || null,
-          leave_balance: parseFloat(form.initialBalance) || 25,
-          first_name: form.firstName.trim(),
-          last_name: form.lastName.trim(),
-        })
-        .eq('id', data.user.id);
-
+    if (error || data?.error) {
+      toast({ title: 'Error', description: data?.error || error?.message, variant: 'destructive' });
+    } else {
       toast({
         title: language === 'fr' ? 'Employé ajouté' : 'Employee added',
-        description: language === 'fr' ? 'Invitation envoyée' : 'Invitation sent',
+        description: language === 'fr' ? 'Invitation envoyée par email' : 'Invitation email sent',
       });
       setDialogOpen(false);
       setForm({ firstName: '', lastName: '', email: '', hireDate: '', initialBalance: '25' });

@@ -344,22 +344,17 @@ export default function AdminDashboard() {
                           <Badge variant={r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'destructive' : (r.status as string) === 'cancelled' ? 'secondary' : 'warning'}>
                             {(r.status as string) === 'cancelled' ? (language === 'fr' ? 'Annulé' : 'Cancelled') : t(r.status)}
                           </Badge>
-                          {balance !== null && balance < 0 && (r.type === 'paid_leave' || r.type === 'public_holiday') && (
-                            <span className="block text-xs text-destructive mt-0.5">
-                              {language === 'fr' ? 'Solde' : 'Balance'}: {balance.toFixed(2)}
-                            </span>
-                          )}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{r.admin_comment || '—'}</td>
                         <td className="px-4 py-3">
                           {r.status === 'approved' && (
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="text-destructive hover:text-destructive"
+                              className="text-muted-foreground border-muted-foreground/30 hover:bg-muted"
                               onClick={() => setCancelTarget(r)}
                             >
-                              <XCircle className="h-4 w-4" />
+                              {t('cancel')}
                             </Button>
                           )}
                         </td>

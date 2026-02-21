@@ -7,11 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const { signIn } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { toast } = useToast();
@@ -20,13 +22,23 @@ export default function Login() {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
     setLoading(true);
-    const { error } = await signIn(email.trim(), password);
-    if (error) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
+
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { first_name: 'Admin', last_name: 'Techflow' } },
       });
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      } else {
+        toast({ title: 'Success', description: 'Account created! You are now logged in.' });
+      }
+    } else {
+      const { error } = await signIn(email.trim(), password);
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
     }
     setLoading(false);
   };
@@ -68,8 +80,15 @@ export default function Login() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? '...' : t('login')}
+                {loading ? '...' : isSignUp ? 'Sign Up' : t('login')}
               </Button>
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {isSignUp ? 'Already have an account? Log in' : 'First time? Create admin account'}
+              </button>
             </form>
           </CardContent>
         </Card>

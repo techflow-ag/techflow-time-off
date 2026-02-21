@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon, AlertTriangle } from 'lucide-react';
 import { calculateBusinessDays, cn, formatDate } from '@/lib/utils';
-import { computeLeaveBalance } from '@/lib/leaveBalance';
+import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -30,25 +30,30 @@ export default function NewRequest() {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [approvedPaidDays, setApprovedPaidDays] = useState(0);
+  const [approvedHolidayDays, setApprovedHolidayDays] = useState(0);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from('leave_requests')
-      .select('number_of_days')
+      .select('number_of_days, type')
       .eq('employee_id', user.id)
       .eq('status', 'approved')
-      .eq('type', 'paid_leave')
+      .in('type', ['paid_leave', 'public_holiday'])
       .then(({ data }) => {
-        const total = (data || []).reduce((sum, r) => sum + Number(r.number_of_days), 0);
-        setApprovedPaidDays(total);
+        const paid = (data || []).filter(r => r.type === 'paid_leave').reduce((sum, r) => sum + Number(r.number_of_days), 0);
+        const holiday = (data || []).filter(r => r.type === 'public_holiday').reduce((sum, r) => sum + Number(r.number_of_days), 0);
+        setApprovedPaidDays(paid);
+        setApprovedHolidayDays(holiday);
       });
   }, [user]);
 
-  const balance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
+  const paidBalance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
+  const holidayBalance = profile ? computeHolidayBalance(profile, approvedHolidayDays) : 0;
   const businessDays = startDate && endDate ? calculateBusinessDays(startDate, endDate) : 0;
-  const exceedsBalance = leaveType === 'paid_leave' && businessDays > balance;
-  const isPastDate = startDate && startDate < new Date(new Date().toDateString());
+
+  const currentBalance = leaveType === 'paid_leave' ? paidBalance : leaveType === 'public_holiday' ? holidayBalance : null;
+  const exceedsBalance = currentBalance !== null && businessDays > currentBalance;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,11 +119,6 @@ export default function NewRequest() {
                     />
                   </PopoverContent>
                 </Popover>
-                {isPastDate && (
-                  <p className="flex items-center gap-1 text-xs text-destructive">
-                    <AlertTriangle className="h-3 w-3" /> {t('pastDateError')}
-                  </p>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -161,7 +161,7 @@ export default function NewRequest() {
             {exceedsBalance && (
               <div className="flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm text-warning">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                {t('balanceWarning')} ({balance.toFixed(2)} {t('daysRemaining')})
+                {t('balanceWarning')} ({currentBalance!.toFixed(2)} {t('daysRemaining')})
               </div>
             )}
 
@@ -174,6 +174,7 @@ export default function NewRequest() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="paid_leave">{t('paidLeave')}</SelectItem>
+                  <SelectItem value="public_holiday">{t('publicHoliday')}</SelectItem>
                   <SelectItem value="sick_leave">{t('sickLeave')}</SelectItem>
                   <SelectItem value="unpaid_leave">{t('unpaidLeave')}</SelectItem>
                   <SelectItem value="other">{t('other')}</SelectItem>

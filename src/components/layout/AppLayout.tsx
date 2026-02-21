@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import techflowLogo from '@/assets/TechFlow_Logo.png';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -39,7 +40,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const adminLinks = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard') },
     { to: '/team-calendar', icon: CalendarDays, label: t('teamCalendar') },
-    { to: '/leave-requests', icon: ClipboardList, label: t('leaveRequests') },
     { to: '/employees', icon: Users, label: t('employees') },
     { to: '/profile', icon: User, label: t('myProfile') },
   ];
@@ -69,7 +69,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       >
         {/* Logo */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-border">
-          <span className="text-xl font-bold text-primary">Techflow</span>
+          <img src={techflowLogo} alt="TechFlow" className="h-8 w-auto" />
           <button className="lg:hidden" onClick={() => setSidebarOpen(false)}>
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
@@ -134,7 +134,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <button onClick={() => setSidebarOpen(true)}>
             <Menu className="h-6 w-6 text-foreground" />
           </button>
-          <span className="text-lg font-bold text-primary">Techflow</span>
+          <img src={techflowLogo} alt="TechFlow" className="h-7 w-auto" />
         </header>
 
         <main className="flex-1 overflow-auto p-4 md:p-8">

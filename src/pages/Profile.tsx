@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { computeLeaveBalance } from '@/lib/leaveBalance';
+import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
+import { formatDate } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 
 export default function Profile() {
@@ -20,26 +21,27 @@ export default function Profile() {
   const [emailField, setEmailField] = useState(profile?.email || '');
   const [saving, setSaving] = useState(false);
 
-  // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // Approved paid leave days for dynamic balance
   const [approvedPaidDays, setApprovedPaidDays] = useState(0);
+  const [approvedHolidayDays, setApprovedHolidayDays] = useState(0);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from('leave_requests')
-      .select('number_of_days')
+      .select('number_of_days, type')
       .eq('employee_id', user.id)
       .eq('status', 'approved')
-      .eq('type', 'paid_leave')
+      .in('type', ['paid_leave', 'public_holiday'])
       .then(({ data }) => {
-        const total = (data || []).reduce((sum, r) => sum + Number(r.number_of_days), 0);
-        setApprovedPaidDays(total);
+        const paid = (data || []).filter(r => r.type === 'paid_leave').reduce((sum, r) => sum + Number(r.number_of_days), 0);
+        const holiday = (data || []).filter(r => r.type === 'public_holiday').reduce((sum, r) => sum + Number(r.number_of_days), 0);
+        setApprovedPaidDays(paid);
+        setApprovedHolidayDays(holiday);
       });
   }, [user]);
 
@@ -51,13 +53,13 @@ export default function Profile() {
     }
   }, [profile]);
 
-  const balance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
+  const paidBalance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
+  const holidayBalance = profile ? computeHolidayBalance(profile, approvedHolidayDays) : 0;
 
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
 
-    // Update profile name
     const { error: profileError } = await supabase
       .from('profiles')
       .update({ first_name: firstName.trim(), last_name: lastName.trim() })
@@ -69,7 +71,6 @@ export default function Profile() {
       return;
     }
 
-    // Update email if changed
     if (emailField.trim() !== profile?.email) {
       const { error: emailError } = await supabase.auth.updateUser({ email: emailField.trim() });
       if (emailError) {
@@ -77,7 +78,6 @@ export default function Profile() {
         setSaving(false);
         return;
       }
-      // Also update email in profiles table
       await supabase.from('profiles').update({ email: emailField.trim() }).eq('id', user.id);
       toast({
         title: language === 'fr' ? 'Email de confirmation envoyé' : 'Confirmation email sent',
@@ -85,9 +85,7 @@ export default function Profile() {
       });
     }
 
-    toast({
-      title: language === 'fr' ? 'Profil mis à jour' : 'Profile updated',
-    });
+    toast({ title: language === 'fr' ? 'Profil mis à jour' : 'Profile updated' });
     setEditing(false);
     setSaving(false);
   };
@@ -107,18 +105,13 @@ export default function Profile() {
 
     setChangingPassword(true);
 
-    // Verify current password by re-signing in
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: profile.email,
       password: currentPassword,
     });
 
     if (signInError) {
-      toast({
-        title: 'Error',
-        description: language === 'fr' ? 'Mot de passe actuel incorrect' : 'Current password is incorrect',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: language === 'fr' ? 'Mot de passe actuel incorrect' : 'Current password is incorrect', variant: 'destructive' });
       setChangingPassword(false);
       return;
     }
@@ -194,7 +187,7 @@ export default function Profile() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('hireDate')}</p>
-                <p className="font-medium text-foreground">{profile.hire_date || '—'}</p>
+                <p className="font-medium text-foreground">{profile.hire_date ? formatDate(profile.hire_date, language) : '—'}</p>
               </div>
             </div>
           )}
@@ -209,14 +202,14 @@ export default function Profile() {
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <p className="text-sm text-muted-foreground">{t('currentBalance')}</p>
-              <p className="text-3xl font-bold text-foreground">{balance.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">{t('daysRemaining')}</p>
+              <p className="text-sm text-muted-foreground">{t('paidLeave')}</p>
+              <p className="text-3xl font-bold text-foreground">{paidBalance.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">+{Number(profile.monthly_accrual).toFixed(2)} {t('daysPerMonth')}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">{t('monthlyAccrual')}</p>
-              <p className="text-xl font-semibold text-foreground">+{Number(profile.monthly_accrual).toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">{t('daysPerMonth')}</p>
+              <p className="text-sm text-muted-foreground">{t('publicHoliday')}</p>
+              <p className="text-3xl font-bold text-foreground">{holidayBalance.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">+{Number(profile.monthly_holiday_accrual).toFixed(2)} {t('daysPerMonth')}</p>
             </div>
           </div>
         </CardContent>
@@ -231,32 +224,15 @@ export default function Profile() {
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div className="space-y-2">
               <Label>{language === 'fr' ? 'Mot de passe actuel' : 'Current Password'}</Label>
-              <Input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
-              />
+              <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label>{language === 'fr' ? 'Nouveau mot de passe' : 'New Password'}</Label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                minLength={6}
-              />
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} />
             </div>
             <div className="space-y-2">
               <Label>{language === 'fr' ? 'Confirmer le mot de passe' : 'Confirm Password'}</Label>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={6}
-              />
+              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} />
             </div>
             <Button type="submit" disabled={changingPassword}>
               {changingPassword ? '...' : (language === 'fr' ? 'Mettre à jour' : 'Update Password')}

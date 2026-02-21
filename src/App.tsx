@@ -66,7 +66,7 @@ function AppRoutes() {
         />
         <Route path="/new-request" element={<NewRequest />} />
         <Route path="/my-leave" element={<LeaveHistory />} />
-        <Route path="/leave-requests" element={isAdmin ? <LeaveHistory /> : <Navigate to="/dashboard" />} />
+        <Route path="/leave-requests" element={<Navigate to="/dashboard" />} />
         <Route path="/team-calendar" element={isAdmin ? <TeamCalendarPage /> : <Navigate to="/dashboard" />} />
         <Route path="/employees" element={isAdmin ? <EmployeeManagement /> : <Navigate to="/dashboard" />} />
         <Route path="/profile" element={<Profile />} />

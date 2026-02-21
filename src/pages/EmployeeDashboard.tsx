@@ -4,9 +4,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, Clock, TrendingUp } from 'lucide-react';
+import { CalendarDays, Clock, TrendingUp, Landmark, Briefcase } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
-import { computeLeaveBalance } from '@/lib/leaveBalance';
+import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import type { Tables } from '@/integrations/supabase/types';
 
 export default function EmployeeDashboard() {
@@ -33,9 +33,12 @@ export default function EmployeeDashboard() {
     .filter((r) => r.status === 'approved' && r.type === 'paid_leave')
     .reduce((sum, r) => sum + Number(r.number_of_days), 0);
 
-  const balance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
-  const maxBalance = 25;
-  const balancePercent = Math.min((balance / maxBalance) * 100, 100);
+  const approvedHolidayDays = requests
+    .filter((r) => r.status === 'approved' && r.type === 'public_holiday')
+    .reduce((sum, r) => sum + Number(r.number_of_days), 0);
+
+  const paidBalance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
+  const holidayBalance = profile ? computeHolidayBalance(profile, approvedHolidayDays) : 0;
 
   return (
     <div className="space-y-8">
@@ -51,53 +54,57 @@ export default function EmployeeDashboard() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Balance card */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Paid leave balance */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t('leaveBalance')}
+              {t('paidLeave')}
             </CardTitle>
             <TrendingUp className="h-5 w-5 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{balance.toFixed(2)}</div>
+            <div className="text-3xl font-bold text-foreground">{paidBalance.toFixed(2)}</div>
             <p className="text-sm text-muted-foreground">{t('daysRemaining')}</p>
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${balancePercent}%` }}
-              />
-            </div>
             {profile?.monthly_accrual && (
               <p className="mt-2 text-xs text-muted-foreground">
-                +{profile.monthly_accrual} {t('daysPerMonth')}
+                +{Number(profile.monthly_accrual).toFixed(2)} {t('daysPerMonth')}
               </p>
             )}
           </CardContent>
         </Card>
 
-        {/* Upcoming leave */}
+        {/* Public holiday balance */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t('upcomingLeave')}
+              {t('publicHoliday')}
             </CardTitle>
-            <CalendarDays className="h-5 w-5 text-primary" />
+            <Landmark className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            {upcomingLeave ? (
-              <>
-                <div className="text-lg font-semibold text-foreground">
-                  {formatDate(upcomingLeave.start_date, language)} → {formatDate(upcomingLeave.end_date, language)}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {upcomingLeave.number_of_days} {t('days')}
-                </p>
-              </>
-            ) : (
-              <p className="text-muted-foreground">{t('noUpcoming')}</p>
+            <div className="text-3xl font-bold text-foreground">{holidayBalance.toFixed(2)}</div>
+            <p className="text-sm text-muted-foreground">{t('daysRemaining')}</p>
+            {profile?.monthly_holiday_accrual && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                +{Number(profile.monthly_holiday_accrual).toFixed(2)} {t('daysPerMonth')}
+              </p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Start date */}
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t('hireDate')}
+            </CardTitle>
+            <Briefcase className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold text-foreground">
+              {profile?.hire_date ? formatDate(profile.hire_date, language) : '—'}
+            </div>
           </CardContent>
         </Card>
 
@@ -115,6 +122,26 @@ export default function EmployeeDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Upcoming leave */}
+      {upcomingLeave && (
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t('upcomingLeave')}
+            </CardTitle>
+            <CalendarDays className="h-5 w-5 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold text-foreground">
+              {formatDate(upcomingLeave.start_date, language)} → {formatDate(upcomingLeave.end_date, language)}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {upcomingLeave.number_of_days} {t('days')}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent requests */}
       <Card className="shadow-sm">
@@ -144,7 +171,7 @@ export default function EmployeeDashboard() {
                       <td className="px-3 py-3 text-foreground">{r.number_of_days}</td>
                       <td className="px-3 py-3">
                         <span className="text-muted-foreground capitalize">
-                          {t(r.type === 'paid_leave' ? 'paidLeave' : r.type === 'sick_leave' ? 'sickLeave' : r.type === 'unpaid_leave' ? 'unpaidLeave' : 'other')}
+                          {t(r.type === 'paid_leave' ? 'paidLeave' : r.type === 'public_holiday' ? 'publicHoliday' : r.type === 'sick_leave' ? 'sickLeave' : r.type === 'unpaid_leave' ? 'unpaidLeave' : 'other')}
                         </span>
                       </td>
                       <td className="px-3 py-3">

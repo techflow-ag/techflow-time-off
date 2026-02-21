@@ -78,7 +78,7 @@ export default function LeaveHistory() {
                       </td>
                       <td className="px-4 py-3 text-foreground">{r.number_of_days}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {t(r.type === 'paid_leave' ? 'paidLeave' : r.type === 'sick_leave' ? 'sickLeave' : r.type === 'unpaid_leave' ? 'unpaidLeave' : 'other')}
+                        {t(r.type === 'paid_leave' ? 'paidLeave' : r.type === 'public_holiday' ? 'publicHoliday' : r.type === 'sick_leave' ? 'sickLeave' : r.type === 'unpaid_leave' ? 'unpaidLeave' : 'other')}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'destructive' : 'warning'}>

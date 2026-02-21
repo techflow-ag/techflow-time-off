@@ -85,6 +85,7 @@ export type Database = {
           last_name: string
           leave_balance: number
           monthly_accrual: number
+          monthly_holiday_accrual: number
         }
         Insert: {
           created_at?: string
@@ -96,6 +97,7 @@ export type Database = {
           last_name?: string
           leave_balance?: number
           monthly_accrual?: number
+          monthly_holiday_accrual?: number
         }
         Update: {
           created_at?: string
@@ -107,6 +109,7 @@ export type Database = {
           last_name?: string
           leave_balance?: number
           monthly_accrual?: number
+          monthly_holiday_accrual?: number
         }
         Relationships: []
       }
@@ -144,7 +147,12 @@ export type Database = {
     Enums: {
       app_role: "admin" | "employee"
       leave_status: "pending" | "approved" | "rejected"
-      leave_type: "paid_leave" | "sick_leave" | "unpaid_leave" | "other"
+      leave_type:
+        | "paid_leave"
+        | "sick_leave"
+        | "unpaid_leave"
+        | "other"
+        | "public_holiday"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -274,7 +282,13 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "employee"],
       leave_status: ["pending", "approved", "rejected"],
-      leave_type: ["paid_leave", "sick_leave", "unpaid_leave", "other"],
+      leave_type: [
+        "paid_leave",
+        "sick_leave",
+        "unpaid_leave",
+        "other",
+        "public_holiday",
+      ],
     },
   },
 } as const

@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
         .from("profiles")
         .update({
           hire_date: hireDate || null,
-          leave_balance: initialBalance ?? 25,
+          leave_balance: initialBalance ?? 0,
           first_name: firstName,
           last_name: lastName,
         })

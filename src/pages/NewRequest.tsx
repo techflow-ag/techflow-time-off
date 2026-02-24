@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { CalendarIcon, AlertTriangle } from 'lucide-react';
-import { calculateBusinessDays, cn, formatDate } from '@/lib/utils';
+import { calculateBusinessDays, cn, formatDate, toLocalDateString } from '@/lib/utils';
 import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
@@ -64,8 +64,8 @@ export default function NewRequest() {
     setLoading(true);
     const { error } = await supabase.from('leave_requests').insert({
       employee_id: user.id,
-      start_date: startDate.toISOString().split('T')[0],
-      end_date: endDate.toISOString().split('T')[0],
+      start_date: toLocalDateString(startDate),
+      end_date: toLocalDateString(endDate),
       number_of_days: businessDays,
       type: leaveType,
       reason: reason.trim() || null,
@@ -80,8 +80,8 @@ export default function NewRequest() {
         body: {
           employeeName,
           leaveType,
-          startDate: startDate!.toISOString().split('T')[0],
-          endDate: endDate!.toISOString().split('T')[0],
+          startDate: toLocalDateString(startDate!),
+          endDate: toLocalDateString(endDate!),
           numberOfDays: businessDays,
           reason: reason.trim() || null,
         },

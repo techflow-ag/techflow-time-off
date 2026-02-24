@@ -24,6 +24,14 @@ export default function SetPassword() {
         setReady(true);
       }
     });
+
+    // Also check if there's already an active session (event may have fired before mount)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setReady(true);
+      }
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 

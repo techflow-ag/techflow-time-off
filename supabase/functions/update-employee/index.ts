@@ -50,11 +50,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { userId, email, hireDate, monthlyAccrual, monthlyHolidayAccrual, action } = await req.json();
+    const { userId, email, hireDate, monthlyAccrual, monthlyHolidayAccrual, action, tempPassword } = await req.json();
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "Missing userId" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle reset password action
+    if (action === "resetPassword") {
+      const { error: pwError } = await adminClient.auth.admin.updateUserById(userId, {
+        password: tempPassword || "TechFlow2026!",
+      });
+      if (pwError) {
+        return new Response(JSON.stringify({ error: pwError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

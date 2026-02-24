@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { UserPlus, Pencil, Trash2 } from 'lucide-react';
+import { UserPlus, Pencil, Trash2, KeyRound } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +29,7 @@ export default function EmployeeManagement() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Tables<'profiles'> | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -133,6 +134,23 @@ export default function EmployeeManagement() {
     setSaving(false);
   };
 
+  const handleResetPassword = async () => {
+    if (!editingProfile) return;
+    setResettingPassword(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(editingProfile.email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({
+        title: language === 'fr' ? 'Email envoyé' : 'Email sent',
+        description: language === 'fr' ? 'Un email de réinitialisation a été envoyé à l\'employé' : 'A password reset email has been sent to the employee',
+      });
+    }
+    setResettingPassword(false);
+  };
+
   const toggleActive = async (profile: Tables<'profiles'>) => {
     await supabase.from('profiles').update({ is_active: !profile.is_active }).eq('id', profile.id);
     fetchProfiles();
@@ -222,6 +240,16 @@ export default function EmployeeManagement() {
               <Label>{t('publicHoliday')} — {t('monthlyAccrual')} ({t('daysPerMonth')})</Label>
               <Input type="number" step="0.01" min="0" value={editForm.monthlyHolidayAccrual} onChange={(e) => setEditForm((f) => ({ ...f, monthlyHolidayAccrual: e.target.value }))} />
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-muted-foreground"
+              onClick={handleResetPassword}
+              disabled={resettingPassword}
+            >
+              <KeyRound className="mr-2 h-4 w-4" />
+              {resettingPassword ? '...' : (language === 'fr' ? 'Réinitialiser le mot de passe' : 'Reset Password')}
+            </Button>
             <div className="flex gap-2">
               <Button type="button" variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>{t('cancel')}</Button>
               <Button type="submit" className="flex-1" disabled={saving}>{saving ? '...' : t('save')}</Button>

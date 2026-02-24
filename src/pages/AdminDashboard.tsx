@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Users, Clock, CalendarDays, XCircle } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import { formatDate, toLocalDateString } from '@/lib/utils';
 import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
@@ -74,7 +74,7 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateString(new Date());
   const onLeaveToday = profiles.filter((p) =>
     allRequests.some(
       (r) =>

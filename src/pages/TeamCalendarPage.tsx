@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { toLocalDateString } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 
 type LeaveWithProfile = Tables<'leave_requests'> & {
@@ -26,8 +27,8 @@ export default function TeamCalendarPage() {
   useEffect(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-    const firstDay = new Date(year, month, 1).toISOString().split('T')[0];
-    const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    const firstDay = toLocalDateString(new Date(year, month, 1));
+    const lastDay = toLocalDateString(new Date(year, month + 1, 0));
 
     supabase
       .from('leave_requests')

@@ -98,6 +98,7 @@ export default function AdminDashboard() {
 
   const handleDecision = async (requestId: string, status: 'approved' | 'rejected') => {
     setProcessing(requestId);
+    const request = pendingRequests.find((r) => r.id === requestId);
     const { error } = await supabase
       .from('leave_requests')
       .update({
@@ -111,6 +112,23 @@ export default function AdminDashboard() {
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
+      // Notify the employee (fire-and-forget)
+      if (request?.profiles) {
+        supabase.functions.invoke('notify-leave-decision', {
+          body: {
+            employeeId: request.employee_id,
+            employeeName: `${request.profiles.first_name} ${request.profiles.last_name}`.trim(),
+            employeeEmail: request.profiles.email,
+            status,
+            startDate: request.start_date,
+            endDate: request.end_date,
+            numberOfDays: request.number_of_days,
+            leaveType: request.type,
+            adminComment: comments[requestId] || null,
+          },
+        }).catch(console.error);
+      }
+
       toast({
         title: status === 'approved' ? t('approved') : t('rejected'),
         description: language === 'fr' ? 'Demande traitée avec succès' : 'Request processed successfully',

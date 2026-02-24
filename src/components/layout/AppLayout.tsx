@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import techflowLogo from '@/assets/TechFlow_Logo.png';
+import NotificationBell from '@/components/NotificationBell';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -139,12 +140,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Main content */}
       <div className="flex flex-1 flex-col">
         {/* Mobile header */}
-        <header className="flex h-16 items-center gap-4 border-b border-border bg-card px-4 lg:hidden">
-          <button onClick={() => setSidebarOpen(true)}>
-            <Menu className="h-6 w-6 text-foreground" />
-          </button>
-          <img src={techflowLogo} alt="TechFlow" className="h-7 w-auto" />
+        <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(true)}>
+              <Menu className="h-6 w-6 text-foreground" />
+            </button>
+            <img src={techflowLogo} alt="TechFlow" className="h-7 w-auto" />
+          </div>
+          {isAdmin && <NotificationBell />}
         </header>
+
+        {/* Desktop notification bell */}
+        {isAdmin && (
+          <div className="hidden lg:flex items-center justify-end px-8 pt-4">
+            <NotificationBell />
+          </div>
+        )}
 
         <main className="flex-1 overflow-auto p-4 md:p-8">
           <div className="mx-auto max-w-7xl animate-fade-in">{children}</div>

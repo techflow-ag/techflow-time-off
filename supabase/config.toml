@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.update-employee]
 verify_jwt = false
+
+[functions.notify-leave-request]
+verify_jwt = false
+
+[functions.notify-leave-decision]
+verify_jwt = false

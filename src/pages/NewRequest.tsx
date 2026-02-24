@@ -74,6 +74,19 @@ export default function NewRequest() {
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
+      // Notify admins (fire-and-forget)
+      const employeeName = profile ? `${profile.first_name} ${profile.last_name}`.trim() : 'Employee';
+      supabase.functions.invoke('notify-leave-request', {
+        body: {
+          employeeName,
+          leaveType,
+          startDate: startDate!.toISOString().split('T')[0],
+          endDate: endDate!.toISOString().split('T')[0],
+          numberOfDays: businessDays,
+          reason: reason.trim() || null,
+        },
+      }).catch(console.error);
+
       toast({
         title: language === 'fr' ? 'Demande soumise' : 'Request submitted',
         description: language === 'fr' ? 'Votre demande a été envoyée' : 'Your request has been sent for review',

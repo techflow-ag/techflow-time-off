@@ -9,11 +9,20 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { UserPlus, Pencil, Trash2, KeyRound } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
+
+type ApprovedLeave = {
+  id: string;
+  type: string;
+  start_date: string;
+  end_date: string;
+  number_of_days: number;
+};
 
 export default function EmployeeManagement() {
   const { t, language } = useLanguage();
@@ -30,6 +39,9 @@ export default function EmployeeManagement() {
   const [deleteTarget, setDeleteTarget] = useState<Tables<'profiles'> | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [detailProfile, setDetailProfile] = useState<Tables<'profiles'> | null>(null);
+  const [detailLeaves, setDetailLeaves] = useState<ApprovedLeave[]>([]);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -38,6 +50,18 @@ export default function EmployeeManagement() {
     initialBalance: '0',
   });
   const [inviting, setInviting] = useState(false);
+
+  const openDetail = async (profile: Tables<'profiles'>) => {
+    setDetailProfile(profile);
+    setDetailOpen(true);
+    const { data } = await supabase
+      .from('leave_requests')
+      .select('id, type, start_date, end_date, number_of_days')
+      .eq('employee_id', profile.id)
+      .eq('status', 'approved')
+      .order('start_date', { ascending: false });
+    setDetailLeaves((data as ApprovedLeave[]) || []);
+  };
 
   const fetchProfiles = async () => {
     const [profRes, leaveRes] = await Promise.all([
@@ -300,7 +324,7 @@ export default function EmployeeManagement() {
                   const holidayBal = computeHolidayBalance(p, approvedHolidayMap[p.id] || 0);
                   const totalTaken = totalLeaveTaken[p.id] || 0;
                   return (
-                    <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                    <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => openDetail(p)}>
                       <td className="px-4 py-3 font-medium text-foreground">
                         <div className="flex items-center gap-2">
                           <Avatar className="h-7 w-7">
@@ -328,7 +352,7 @@ export default function EmployeeManagement() {
                           {p.is_active ? t('active') : t('inactive')}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1">
                           <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>
                             <Pencil className="h-4 w-4" />
@@ -351,6 +375,50 @@ export default function EmployeeManagement() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Employee Leave Detail Dialog */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {detailProfile ? `${detailProfile.first_name} ${detailProfile.last_name}` : ''} — {language === 'fr' ? 'Congés approuvés' : 'Approved Leaves'}
+            </DialogTitle>
+          </DialogHeader>
+          {detailLeaves.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-4">{language === 'fr' ? 'Aucun congé approuvé.' : 'No approved leaves.'}</p>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('type')}</TableHead>
+                    <TableHead>{t('startDate')}</TableHead>
+                    <TableHead>{t('endDate')}</TableHead>
+                    <TableHead className="text-right">{language === 'fr' ? 'Jours' : 'Days'}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detailLeaves.map((l) => (
+                    <TableRow key={l.id}>
+                      <TableCell>
+                        <Badge variant="outline">{t(l.type as any)}</Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(l.start_date, language)}</TableCell>
+                      <TableCell>{formatDate(l.end_date, language)}</TableCell>
+                      <TableCell className="text-right font-medium">{Number(l.number_of_days).toFixed(1)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="flex justify-end border-t pt-3 mt-2">
+                <span className="font-semibold text-foreground">
+                  {language === 'fr' ? 'Total' : 'Total'}: {detailLeaves.reduce((s, l) => s + Number(l.number_of_days), 0).toFixed(1)} {language === 'fr' ? 'jours' : 'days'}
+                </span>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -59,17 +59,41 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Handle reset password action
+    // Handle reset password action — send recovery email via Supabase Auth API
     if (action === "resetPassword") {
-      const { error: pwError } = await adminClient.auth.admin.updateUserById(userId, {
-        password: tempPassword || "TechFlow2026!",
-      });
-      if (pwError) {
-        return new Response(JSON.stringify({ error: pwError.message }), {
+      // Get the user's email from their profile
+      const { data: targetUser, error: userError } = await adminClient.auth.admin.getUserById(userId);
+      if (userError || !targetUser?.user?.email) {
+        return new Response(JSON.stringify({ error: userError?.message || "User not found" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      const redirectTo = req.headers.get("x-redirect-to") || `${supabaseUrl}`;
+
+      // Use the Supabase Auth REST API to trigger a recovery email
+      const recoverResponse = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": serviceRoleKey,
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          email: targetUser.user.email,
+          gotrue_meta_security: { captcha_token: "" },
+        }),
+      });
+
+      if (!recoverResponse.ok) {
+        const errBody = await recoverResponse.text();
+        return new Response(JSON.stringify({ error: `Failed to send recovery email: ${errBody}` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

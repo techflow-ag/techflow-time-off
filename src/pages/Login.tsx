@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Globe } from 'lucide-react';
+import { Globe, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -14,6 +14,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
   const { signIn } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const { toast } = useToast();
@@ -43,6 +45,81 @@ export default function Login() {
     setLoading(false);
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) return;
+    setLoading(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+      redirectTo: window.location.origin,
+    });
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({
+        title: t('resetEmailSent'),
+        description: t('resetEmailSentDesc'),
+      });
+    }
+    setLoading(false);
+  };
+
+  if (isForgotPassword) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md space-y-6">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-primary">Techflow</h1>
+          </div>
+
+          <Card className="shadow-lg border-border">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl">{t('forgotPasswordTitle')}</CardTitle>
+              <CardDescription>{t('forgotPasswordSubtitle')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">{t('email')}</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="you@techflow.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? '...' : t('sendResetLink')}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPassword(false)}
+                  className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  {t('backToLogin')}
+                </button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-center">
+            <button
+              onClick={() => setLanguage(language === 'en' ? 'fr' : 'en')}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Globe className="h-4 w-4" />
+              {language === 'en' ? 'Français' : 'English'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
@@ -70,7 +147,19 @@ export default function Login() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">{t('password')}</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">{t('password')}</Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(email);
+                      setIsForgotPassword(true);
+                    }}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {t('forgotPassword')}
+                  </button>
+                </div>
                 <Input
                   id="password"
                   type="password"

@@ -161,11 +161,11 @@ export default function EmployeeManagement() {
   const handleResetPassword = async () => {
     if (!editingProfile) return;
     setResettingPassword(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(editingProfile.email, {
-      redirectTo: window.location.origin,
+    const { data, error } = await supabase.functions.invoke('update-employee', {
+      body: { userId: editingProfile.id, action: 'resetPassword' },
     });
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error || data?.error) {
+      toast({ title: 'Error', description: data?.error || error?.message, variant: 'destructive' });
     } else {
       toast({
         title: language === 'fr' ? 'Email envoyé' : 'Email sent',

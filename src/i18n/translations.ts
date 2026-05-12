@@ -83,6 +83,13 @@ export const translations = {
     adjustment: "Adjustment",
     leaveHistory: "Leave History",
     balanceHistory: "Balance History",
+    forgotPassword: "Forgot password?",
+    forgotPasswordTitle: "Reset your password",
+    forgotPasswordSubtitle: "Enter your email and we'll send you a reset link",
+    sendResetLink: "Send reset link",
+    backToLogin: "Back to login",
+    resetEmailSent: "Reset email sent",
+    resetEmailSentDesc: "Check your inbox for a link to reset your password",
   },
   fr: {
     dashboard: "Tableau de bord",
@@ -162,6 +169,13 @@ export const translations = {
     adjustment: "Ajustement",
     leaveHistory: "Historique des congés",
     balanceHistory: "Historique du solde",
+    forgotPassword: "Mot de passe oublié ?",
+    forgotPasswordTitle: "Réinitialiser votre mot de passe",
+    forgotPasswordSubtitle: "Entrez votre email et nous vous enverrons un lien de réinitialisation",
+    sendResetLink: "Envoyer le lien",
+    backToLogin: "Retour à la connexion",
+    resetEmailSent: "Email envoyé",
+    resetEmailSentDesc: "Vérifiez votre boîte de réception pour un lien de réinitialisation",
   },
 } as const;
 

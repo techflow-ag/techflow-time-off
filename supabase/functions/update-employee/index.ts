@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { Resend } from "npm:resend@4.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -59,9 +60,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Handle reset password action — send recovery email via Supabase Auth API
+    // Handle reset password action — generate recovery link and send via Resend
     if (action === "resetPassword") {
-      // Get the user's email from their profile
       const { data: targetUser, error: userError } = await adminClient.auth.admin.getUserById(userId);
       if (userError || !targetUser?.user?.email) {
         return new Response(JSON.stringify({ error: userError?.message || "User not found" }), {
@@ -70,26 +70,60 @@ Deno.serve(async (req) => {
         });
       }
 
-      const redirectTo = req.headers.get("x-redirect-to") || `${supabaseUrl}`;
+      const redirectTo = req.headers.get("x-redirect-to") || "https://techflow-time-off.lovable.app";
 
-      // Use the Supabase Auth REST API to trigger a recovery email
-      const recoverResponse = await fetch(`${supabaseUrl}/auth/v1/recover`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": serviceRoleKey,
-          "Authorization": `Bearer ${serviceRoleKey}`,
-        },
-        body: JSON.stringify({
-          email: targetUser.user.email,
-          gotrue_meta_security: { captcha_token: "" },
-        }),
+      // Generate a recovery link via Admin API (does not send an email)
+      const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+        type: "recovery",
+        email: targetUser.user.email,
+        options: { redirectTo },
       });
 
-      if (!recoverResponse.ok) {
-        const errBody = await recoverResponse.text();
-        return new Response(JSON.stringify({ error: `Failed to send recovery email: ${errBody}` }), {
+      if (linkError || !linkData?.properties?.action_link) {
+        return new Response(JSON.stringify({ error: linkError?.message || "Failed to generate recovery link" }), {
           status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Send the recovery email via Resend
+      const resendApiKey = Deno.env.get("RESEND_API_KEY");
+      if (!resendApiKey) {
+        return new Response(JSON.stringify({ error: "Email service not configured" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const resend = new Resend(resendApiKey);
+      const employeeName = targetUser.user.user_metadata?.first_name || targetUser.user.email;
+      const recoveryLink = linkData.properties.action_link;
+
+      const { error: emailError } = await resend.emails.send({
+        from: "Techflow Leave Manager <onboarding@resend.dev>",
+        to: [targetUser.user.email],
+        subject: "Reset your password",
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: #1a1a2e; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 20px;">Techflow Leave Manager</h1>
+            </div>
+            <div style="background: #ffffff; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+              <h2 style="color: #6366f1; margin-top: 0;">Password Reset</h2>
+              <p style="color: #374151;">Hi ${employeeName},</p>
+              <p style="color: #374151;">An administrator has requested a password reset for your account. Click the button below to set a new password:</p>
+              <div style="text-align: center; margin: 24px 0;">
+                <a href="${recoveryLink}" style="display: inline-block; background: #6366f1; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Reset My Password</a>
+              </div>
+              <p style="color: #6b7280; font-size: 14px;">If you didn't expect this email, you can safely ignore it. This link will expire in 24 hours.</p>
+            </div>
+          </div>
+        `,
+      });
+
+      if (emailError) {
+        return new Response(JSON.stringify({ error: `Failed to send email: ${emailError.message}` }), {
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

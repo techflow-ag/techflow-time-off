@@ -67,6 +67,10 @@ export default function TeamCalendarPage() {
     }
   });
 
+  const today = new Date();
+  const isToday = (day: number) =>
+    day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+
   const getLeavesForDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     return leaves.filter((l) => l.start_date <= dateStr && l.end_date >= dateStr);
@@ -101,13 +105,15 @@ export default function TeamCalendarPage() {
               return (
                 <div
                   key={idx}
-                  className={`min-h-[80px] rounded-md border border-border p-1 text-sm ${
-                    isWeekend ? 'bg-muted/50' : 'bg-card'
+                  className={`min-h-[80px] rounded-md border p-1 text-sm ${
+                    day && isToday(day)
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                      : isWeekend ? 'border-border bg-muted/50' : 'border-border bg-card'
                   }`}
                 >
                   {day && (
                     <>
-                      <span className="text-xs text-muted-foreground">{day}</span>
+                      <span className={`text-xs font-medium ${isToday(day) ? 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{day}</span>
                       <div className="mt-1 space-y-0.5">
                         {dayLeaves.map((l) => (
                           <div

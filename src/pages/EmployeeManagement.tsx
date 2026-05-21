@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { UserPlus, Pencil, Trash2, KeyRound } from 'lucide-react';
+import { UserPlus, Pencil, Trash2, KeyRound, Copy, Check } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +39,8 @@ export default function EmployeeManagement() {
   const [deleteTarget, setDeleteTarget] = useState<Tables<'profiles'> | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [tempPasswordDialogOpen, setTempPasswordDialogOpen] = useState(false);
   const [detailProfile, setDetailProfile] = useState<Tables<'profiles'> | null>(null);
   const [detailLeaves, setDetailLeaves] = useState<ApprovedLeave[]>([]);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -166,11 +168,10 @@ export default function EmployeeManagement() {
     });
     if (error || data?.error) {
       toast({ title: 'Error', description: data?.error || error?.message, variant: 'destructive' });
-    } else {
-      toast({
-        title: language === 'fr' ? 'Email envoyé' : 'Email sent',
-        description: language === 'fr' ? 'Un email de réinitialisation a été envoyé à l\'employé' : 'A password reset email has been sent to the employee',
-      });
+    } else if (data?.tempPassword) {
+      setTempPassword(data.tempPassword);
+      setEditDialogOpen(false);
+      setTempPasswordDialogOpen(true);
     }
     setResettingPassword(false);
   };
@@ -279,6 +280,36 @@ export default function EmployeeManagement() {
               <Button type="submit" className="flex-1" disabled={saving}>{saving ? '...' : t('save')}</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Temp password dialog */}
+      <Dialog open={tempPasswordDialogOpen} onOpenChange={(open) => { if (!open) { setTempPasswordDialogOpen(false); setTempPassword(null); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{language === 'fr' ? 'Nouveau mot de passe' : 'New Password'}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {language === 'fr'
+              ? 'Voici le mot de passe temporaire. Envoyez-le à l\'employé et demandez-lui de le changer après sa première connexion.'
+              : 'Here is the temporary password. Send it to the employee and ask them to change it after first login.'}
+          </p>
+          <div className="flex items-center gap-2 mt-2">
+            <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm select-all">{tempPassword}</code>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (tempPassword) {
+                  navigator.clipboard.writeText(tempPassword);
+                  toast({ title: language === 'fr' ? 'Copié !' : 'Copied!' });
+                }
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

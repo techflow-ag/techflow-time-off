@@ -11,6 +11,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CalendarIcon, AlertTriangle } from 'lucide-react';
 import { calculateBusinessDays, cn, formatDate, toLocalDateString } from '@/lib/utils';
 import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
@@ -29,6 +31,8 @@ export default function NewRequest() {
   const [endDate, setEndDate] = useState<Date>();
   const [leaveType, setLeaveType] = useState<LeaveType>('paid_leave');
   const [reason, setReason] = useState('');
+  const [isHalfDay, setIsHalfDay] = useState(false);
+  const [halfDayPeriod, setHalfDayPeriod] = useState<'morning' | 'afternoon'>('morning');
   const [loading, setLoading] = useState(false);
   const [approvedPaidDays, setApprovedPaidDays] = useState(0);
   const [approvedHolidayDays, setApprovedHolidayDays] = useState(0);
@@ -52,21 +56,28 @@ export default function NewRequest() {
 
   const paidBalance = profile ? computeLeaveBalance(profile, approvedPaidDays) : 0;
   const holidayBalance = profile ? computeHolidayBalance(profile, approvedHolidayDays) : 0;
-  const businessDays = startDate && endDate ? calculateBusinessDays(startDate, endDate) : 0;
+  const rawBusinessDays = startDate && endDate ? calculateBusinessDays(startDate, endDate) : 0;
+  const isSingleDay = rawBusinessDays === 1;
+  const effectiveDays = isHalfDay && isSingleDay ? 0.5 : rawBusinessDays;
+
+  // Reset half-day when selecting a multi-day range
+  useEffect(() => {
+    if (!isSingleDay) setIsHalfDay(false);
+  }, [isSingleDay]);
 
   const currentBalance = leaveType === 'paid_leave' ? paidBalance : leaveType === 'public_holiday' ? holidayBalance : null;
-  const willBeNegative = currentBalance !== null && (currentBalance - businessDays) < 0;
-  const newBalance = currentBalance !== null ? currentBalance - businessDays : null;
+  const willBeNegative = currentBalance !== null && (currentBalance - effectiveDays) < 0;
+  const newBalance = currentBalance !== null ? currentBalance - effectiveDays : null;
 
   const doSubmit = async () => {
-    if (!user || !startDate || !endDate || businessDays <= 0) return;
+    if (!user || !startDate || !endDate || effectiveDays <= 0) return;
 
     setLoading(true);
     const { error } = await supabase.from('leave_requests').insert({
       employee_id: user.id,
       start_date: toLocalDateString(startDate),
       end_date: toLocalDateString(endDate),
-      number_of_days: businessDays,
+      number_of_days: effectiveDays,
       type: leaveType,
       reason: reason.trim() || null,
     });
@@ -82,7 +93,7 @@ export default function NewRequest() {
           leaveType,
           startDate: toLocalDateString(startDate!),
           endDate: toLocalDateString(endDate!),
-          numberOfDays: businessDays,
+          numberOfDays: effectiveDays,
           reason: reason.trim() || null,
         },
       }).catch(console.error);
@@ -98,7 +109,7 @@ export default function NewRequest() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !startDate || !endDate || businessDays <= 0) return;
+    if (!user || !startDate || !endDate || effectiveDays <= 0) return;
 
     if (willBeNegative) {
       setShowNegativeWarning(true);
@@ -200,10 +211,42 @@ export default function NewRequest() {
             </div>
 
             {/* Business days display */}
-            {businessDays > 0 && (
+            {rawBusinessDays > 0 && (
               <div className="rounded-lg bg-muted p-4 text-center">
                 <p className="text-sm text-muted-foreground">{t('businessDays')}</p>
-                <p className="text-3xl font-bold text-foreground">{businessDays}</p>
+                <p className="text-3xl font-bold text-foreground">{effectiveDays}</p>
+              </div>
+            )}
+
+            {/* Half-day toggle (only for single day) */}
+            {isSingleDay && (
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="half-day-toggle" className="cursor-pointer">
+                    {t('halfDay')}
+                  </Label>
+                  <Switch
+                    id="half-day-toggle"
+                    checked={isHalfDay}
+                    onCheckedChange={setIsHalfDay}
+                  />
+                </div>
+                {isHalfDay && (
+                  <RadioGroup
+                    value={halfDayPeriod}
+                    onValueChange={(v) => setHalfDayPeriod(v as 'morning' | 'afternoon')}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="morning" id="morning" />
+                      <Label htmlFor="morning" className="cursor-pointer">{t('halfDayMorning')}</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="afternoon" id="afternoon" />
+                      <Label htmlFor="afternoon" className="cursor-pointer">{t('halfDayAfternoon')}</Label>
+                    </div>
+                  </RadioGroup>
+                )}
               </div>
             )}
 
@@ -249,7 +292,7 @@ export default function NewRequest() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading || !startDate || !endDate || businessDays <= 0}>
+            <Button type="submit" className="w-full" disabled={loading || !startDate || !endDate || effectiveDays <= 0}>
               {loading ? '...' : t('submitRequest')}
             </Button>
           </form>

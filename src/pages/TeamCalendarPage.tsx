@@ -3,6 +3,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toLocalDateString } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
@@ -17,13 +19,35 @@ const COLORS = [
   'bg-warning/20 text-warning',
   'bg-destructive/20 text-destructive',
   'bg-secondary/20 text-secondary',
+  'bg-blue-500/20 text-blue-600',
+  'bg-pink-500/20 text-pink-600',
+  'bg-teal-500/20 text-teal-600',
+  'bg-orange-500/20 text-orange-600',
+  'bg-violet-500/20 text-violet-600',
 ];
 
 export default function TeamCalendarPage() {
   const { t, language } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [leaves, setLeaves] = useState<LeaveWithProfile[]>([]);
+  const [allEmployees, setAllEmployees] = useState<Tables<'profiles'>[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
 
+  // Fetch all active employees once
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('is_active', true)
+      .order('first_name')
+      .then(({ data }) => {
+        const employees = data || [];
+        setAllEmployees(employees);
+        setSelectedEmployees(new Set(employees.map((e) => e.id)));
+      });
+  }, []);
+
+  // Fetch leaves for current month
   useEffect(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -58,14 +82,33 @@ export default function TeamCalendarPage() {
   for (let i = 0; i < adjustedFirstDay; i++) calendarDays.push(null);
   for (let i = 1; i <= daysInMonth; i++) calendarDays.push(i);
 
+  // Assign a stable color to every employee (not just those with leaves)
   const employeeColorMap = new Map<string, string>();
-  let colorIdx = 0;
-  leaves.forEach((l) => {
-    if (l.profiles && !employeeColorMap.has(l.employee_id)) {
-      employeeColorMap.set(l.employee_id, COLORS[colorIdx % COLORS.length]);
-      colorIdx++;
-    }
+  allEmployees.forEach((emp, idx) => {
+    employeeColorMap.set(emp.id, COLORS[idx % COLORS.length]);
   });
+
+  const allSelected = selectedEmployees.size === allEmployees.length;
+
+  const toggleEmployee = (id: string) => {
+    setSelectedEmployees((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedEmployees(new Set());
+    } else {
+      setSelectedEmployees(new Set(allEmployees.map((e) => e.id)));
+    }
+  };
 
   const today = new Date();
   const isToday = (day: number) =>
@@ -73,12 +116,57 @@ export default function TeamCalendarPage() {
 
   const getLeavesForDay = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return leaves.filter((l) => l.start_date <= dateStr && l.end_date >= dateStr);
+    return leaves.filter(
+      (l) => l.start_date <= dateStr && l.end_date >= dateStr && selectedEmployees.has(l.employee_id)
+    );
   };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-foreground">{t('teamVacationCalendar')}</h1>
+
+      {/* Employee filter */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium">
+            {language === 'fr' ? 'Filtrer par employé' : 'Filter by employee'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {/* Select all */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="select-all"
+                checked={allSelected}
+                onCheckedChange={toggleAll}
+              />
+              <Label htmlFor="select-all" className="cursor-pointer text-sm font-medium">
+                {language === 'fr' ? 'Toute l\'équipe' : 'Entire team'}
+              </Label>
+            </div>
+
+            <div className="w-px bg-border h-5 self-center" />
+
+            {allEmployees.map((emp) => {
+              const color = employeeColorMap.get(emp.id) || '';
+              return (
+                <div key={emp.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`emp-${emp.id}`}
+                    checked={selectedEmployees.has(emp.id)}
+                    onCheckedChange={() => toggleEmployee(emp.id)}
+                  />
+                  <Label htmlFor={`emp-${emp.id}`} className="cursor-pointer text-sm flex items-center gap-1.5">
+                    <span className={`inline-block h-2.5 w-2.5 rounded-sm ${color.split(' ')[0]}`} />
+                    {emp.first_name} {emp.last_name}
+                  </Label>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-sm">
         <CardHeader>
@@ -131,18 +219,20 @@ export default function TeamCalendarPage() {
             })}
           </div>
 
-          {/* Legend */}
-          {leaves.length > 0 && (
+          {/* Legend — all employees, always visible */}
+          {allEmployees.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-3">
-              {Array.from(employeeColorMap.entries()).map(([empId, color]) => {
-                const leave = leaves.find((l) => l.employee_id === empId);
-                return (
-                  <div key={empId} className="flex items-center gap-1.5 text-xs">
-                    <span className={`inline-block h-3 w-3 rounded ${color.split(' ')[0]}`} />
-                    {leave?.profiles?.first_name} {leave?.profiles?.last_name}
-                  </div>
-                );
-              })}
+              {allEmployees
+                .filter((emp) => selectedEmployees.has(emp.id))
+                .map((emp) => {
+                  const color = employeeColorMap.get(emp.id) || '';
+                  return (
+                    <div key={emp.id} className="flex items-center gap-1.5 text-xs">
+                      <span className={`inline-block h-3 w-3 rounded ${color.split(' ')[0]}`} />
+                      {emp.first_name} {emp.last_name}
+                    </div>
+                  );
+                })}
             </div>
           )}
         </CardContent>

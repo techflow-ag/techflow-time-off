@@ -251,7 +251,7 @@ export default function NewRequest() {
             )}
 
             {/* Balance warning */}
-            {willBeNegative && businessDays > 0 && (
+            {willBeNegative && rawBusinessDays > 0 && (
               <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 {language === 'fr'

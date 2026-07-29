@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { isRecoveryUrl } from '@/lib/recovery';
+import { toast } from '@/hooks/use-toast';
 import type { User } from '@supabase/supabase-js';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -47,6 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setProfile(null);
       setRole(null);
+      toast({
+        title: 'Compte désactivé / Account deactivated',
+        description: 'Contactez votre administrateur. / Contact your administrator.',
+        variant: 'destructive',
+      });
       return;
     }
 

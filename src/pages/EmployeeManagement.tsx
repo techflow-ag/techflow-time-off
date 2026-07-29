@@ -34,10 +34,13 @@ export default function EmployeeManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Tables<'profiles'> | null>(null);
-  const [editForm, setEditForm] = useState({ email: '', hireDate: '', monthlyAccrual: '1.5', monthlyHolidayAccrual: '1.08' });
+  const [editForm, setEditForm] = useState({ email: '', hireDate: '', departureDate: '', monthlyAccrual: '1.5', monthlyHolidayAccrual: '1.08' });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Tables<'profiles'> | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<Tables<'profiles'> | null>(null);
+  const [deactivateDate, setDeactivateDate] = useState('');
+  const [deactivating, setDeactivating] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [tempPasswordDialogOpen, setTempPasswordDialogOpen] = useState(false);
@@ -129,6 +132,7 @@ export default function EmployeeManagement() {
     setEditForm({
       email: profile.email,
       hireDate: profile.hire_date || '',
+      departureDate: profile.departure_date || '',
       monthlyAccrual: String(profile.monthly_accrual ?? 1.5),
       monthlyHolidayAccrual: String(profile.monthly_holiday_accrual ?? 1.08),
     });
@@ -145,6 +149,7 @@ export default function EmployeeManagement() {
         userId: editingProfile.id,
         email: editForm.email.trim(),
         hireDate: editForm.hireDate || null,
+        departureDate: editForm.departureDate || null,
         monthlyAccrual: parseFloat(editForm.monthlyAccrual) || 1.5,
         monthlyHolidayAccrual: parseFloat(editForm.monthlyHolidayAccrual) || 1.08,
       },
@@ -177,7 +182,57 @@ export default function EmployeeManagement() {
   };
 
   const toggleActive = async (profile: Tables<'profiles'>) => {
-    await supabase.from('profiles').update({ is_active: !profile.is_active }).eq('id', profile.id);
+    if (profile.is_active) {
+      // Deactivation requires a departure date — open the confirmation dialog
+      setDeactivateDate(profile.departure_date || '');
+      setDeactivateTarget(profile);
+      return;
+    }
+
+    // Reactivation: lifts the auth ban and clears the departure date (server-side)
+    const { data, error } = await supabase.functions.invoke('update-employee', {
+      body: { userId: profile.id, action: 'setActive', active: true },
+    });
+    if (error || data?.error) {
+      toast({ title: 'Error', description: data?.error || error?.message, variant: 'destructive' });
+    } else {
+      toast({
+        title: language === 'fr' ? 'Employé réactivé' : 'Employee reactivated',
+        description: language === 'fr' ? 'La date de départ a été effacée, les compteurs reprennent.' : 'Departure date cleared, accrual resumes.',
+      });
+    }
+    fetchProfiles();
+  };
+
+  const handleDeactivate = async () => {
+    if (!deactivateTarget || !deactivateDate) return;
+    setDeactivating(true);
+
+    // Save the departure date first (freezes the counters), then deactivate + ban
+    const { data: updData, error: updError } = await supabase.functions.invoke('update-employee', {
+      body: { userId: deactivateTarget.id, departureDate: deactivateDate },
+    });
+    if (updError || updData?.error) {
+      toast({ title: 'Error', description: updData?.error || updError?.message, variant: 'destructive' });
+      setDeactivating(false);
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke('update-employee', {
+      body: { userId: deactivateTarget.id, action: 'setActive', active: false },
+    });
+    if (error || data?.error) {
+      toast({ title: 'Error', description: data?.error || error?.message, variant: 'destructive' });
+    } else {
+      toast({
+        title: language === 'fr' ? 'Employé désactivé' : 'Employee deactivated',
+        description: language === 'fr'
+          ? 'Compteurs figés à la date de départ. Connexion bloquée.'
+          : 'Counters frozen at departure date. Login blocked.',
+      });
+    }
+    setDeactivating(false);
+    setDeactivateTarget(null);
     fetchProfiles();
   };
 
@@ -258,6 +313,15 @@ export default function EmployeeManagement() {
               <Input type="date" value={editForm.hireDate} onChange={(e) => setEditForm((f) => ({ ...f, hireDate: e.target.value }))} />
             </div>
             <div className="space-y-2">
+              <Label>{language === 'fr' ? 'Date de départ' : 'Departure Date'}</Label>
+              <Input type="date" value={editForm.departureDate} min={editForm.hireDate || undefined} onChange={(e) => setEditForm((f) => ({ ...f, departureDate: e.target.value }))} />
+              <p className="text-xs text-muted-foreground">
+                {language === 'fr'
+                  ? 'Fige les compteurs de congés à cette date. Obligatoire avant désactivation.'
+                  : 'Freezes leave counters at this date. Required before deactivation.'}
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label>{t('paidLeave')} — {t('monthlyAccrual')} ({t('daysPerMonth')})</Label>
               <Input type="number" step="0.01" min="0" value={editForm.monthlyAccrual} onChange={(e) => setEditForm((f) => ({ ...f, monthlyAccrual: e.target.value }))} />
             </div>
@@ -310,6 +374,40 @@ export default function EmployeeManagement() {
               <Copy className="h-4 w-4" />
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deactivate confirmation — departure date is mandatory */}
+      <Dialog open={!!deactivateTarget} onOpenChange={(open) => !open && setDeactivateTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'fr' ? 'Désactiver' : 'Deactivate'}{deactivateTarget ? ` ${deactivateTarget.first_name} ${deactivateTarget.last_name}` : ''} ?
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); handleDeactivate(); }} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {language === 'fr'
+                ? 'La date de départ est obligatoire : elle fige les compteurs de congés à cette date. L\'employé ne pourra plus se connecter à la plateforme.'
+                : 'The departure date is required: it freezes leave counters at that date. The employee will no longer be able to sign in.'}
+            </p>
+            <div className="space-y-2">
+              <Label>{language === 'fr' ? 'Date de départ' : 'Departure Date'}</Label>
+              <Input
+                type="date"
+                value={deactivateDate}
+                min={deactivateTarget?.hire_date || undefined}
+                onChange={(e) => setDeactivateDate(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setDeactivateTarget(null)}>{t('cancel')}</Button>
+              <Button type="submit" variant="destructive" className="flex-1" disabled={deactivating || !deactivateDate}>
+                {deactivating ? '...' : (language === 'fr' ? 'Désactiver' : 'Deactivate')}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -370,6 +468,11 @@ export default function EmployeeManagement() {
                       <td className="px-4 py-3 text-muted-foreground">{p.email}</td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {p.hire_date ? formatDate(p.hire_date, language) : '—'}
+                        {p.departure_date && (
+                          <span className="block text-xs text-destructive/80">
+                            → {formatDate(p.departure_date, language)}
+                          </span>
+                        )}
                       </td>
                       <td className={`px-4 py-3 font-medium ${paidBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>
                         {paidBalance.toFixed(2)}

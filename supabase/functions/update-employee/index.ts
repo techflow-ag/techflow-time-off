@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { userId, email, hireDate, monthlyAccrual, monthlyHolidayAccrual, action, tempPassword } = await req.json();
+    const { userId, email, hireDate, departureDate, monthlyAccrual, monthlyHolidayAccrual, action, active } = await req.json();
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "Missing userId" }), {
@@ -84,6 +84,53 @@ Deno.serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ success: true, tempPassword: tempPass }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle activate/deactivate — bans or unbans the auth account so a
+    // deactivated employee can no longer sign in at all.
+    if (action === "setActive") {
+      if (active === false) {
+        const { data: profile } = await adminClient
+          .from("profiles")
+          .select("departure_date")
+          .eq("id", userId)
+          .single();
+        if (!profile?.departure_date) {
+          return new Response(JSON.stringify({ error: "Departure date required before deactivation" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      const { error: banError } = await adminClient.auth.admin.updateUserById(userId, {
+        ban_duration: active ? "none" : "876000h",
+      });
+      if (banError) {
+        return new Response(JSON.stringify({ error: banError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Reactivation clears the departure date so accrual resumes
+      const profileUpdate: Record<string, unknown> = { is_active: !!active };
+      if (active) profileUpdate.departure_date = null;
+      const { error: activeError } = await adminClient
+        .from("profiles")
+        .update(profileUpdate)
+        .eq("id", userId);
+      if (activeError) {
+        return new Response(JSON.stringify({ error: activeError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -139,6 +186,7 @@ Deno.serve(async (req) => {
     const updates: Record<string, unknown> = {};
     if (email) updates.email = email;
     if (hireDate !== undefined) updates.hire_date = hireDate || null;
+    if (departureDate !== undefined) updates.departure_date = departureDate || null;
     if (monthlyAccrual !== undefined) updates.monthly_accrual = monthlyAccrual;
     if (monthlyHolidayAccrual !== undefined) updates.monthly_holiday_accrual = monthlyHolidayAccrual;
 

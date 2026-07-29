@@ -40,6 +40,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', userId)
       .single();
 
+    // Deactivated employees are banned at the auth level for new sign-ins;
+    // this also evicts any session that was already open.
+    if (profileData && profileData.is_active === false) {
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setRole(null);
+      return;
+    }
+
     const { data: roleData } = await supabase
       .from('user_roles')
       .select('role')
@@ -84,7 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error ? new Error(error.message) : null };
+    if (!error) return { error: null };
+    // Deactivated employees are banned at the auth level — show a clear message
+    const message = error.message.toLowerCase().includes('banned')
+      ? 'Compte désactivé. Contactez votre administrateur. / Account deactivated. Contact your administrator.'
+      : error.message;
+    return { error: new Error(message) };
   };
 
   const signOut = async () => {

@@ -1,16 +1,19 @@
 import type { Tables } from '@/integrations/supabase/types';
 
+type AccrualProfile = Pick<Tables<'profiles'>, 'hire_date' | 'departure_date'>;
+
 /**
  * Compute the dynamic paid leave balance for an employee:
- * balance = (months_since_hire * monthly_accrual) - approved_paid_leave_days
+ * balance = (months_accrued * monthly_accrual) - approved_paid_leave_days
+ * Accrual stops at departure_date when set (counters are frozen at that date).
  */
 export function computeLeaveBalance(
-  profile: Pick<Tables<'profiles'>, 'hire_date' | 'monthly_accrual'>,
+  profile: AccrualProfile & Pick<Tables<'profiles'>, 'monthly_accrual'>,
   approvedPaidLeaveDays: number
 ): number {
   if (!profile.hire_date) return 0;
 
-  const months = getMonthsSinceHire(profile.hire_date);
+  const months = getAccruedMonths(profile.hire_date, profile.departure_date);
   const accrual = Number(profile.monthly_accrual) || 1.5;
   const totalAccrued = months * accrual;
   return totalAccrued - approvedPaidLeaveDays;
@@ -18,27 +21,34 @@ export function computeLeaveBalance(
 
 /**
  * Compute the dynamic public holiday balance for an employee:
- * balance = (months_since_hire * monthly_holiday_accrual) - approved_public_holiday_days
+ * balance = (months_accrued * monthly_holiday_accrual) - approved_public_holiday_days
+ * Accrual stops at departure_date when set (counters are frozen at that date).
  */
 export function computeHolidayBalance(
-  profile: Pick<Tables<'profiles'>, 'hire_date' | 'monthly_holiday_accrual'>,
+  profile: AccrualProfile & Pick<Tables<'profiles'>, 'monthly_holiday_accrual'>,
   approvedHolidayDays: number
 ): number {
   if (!profile.hire_date) return 0;
 
-  const months = getMonthsSinceHire(profile.hire_date);
+  const months = getAccruedMonths(profile.hire_date, profile.departure_date);
   const accrual = Number(profile.monthly_holiday_accrual) || 1.08;
   const totalAccrued = months * accrual;
   return totalAccrued - approvedHolidayDays;
 }
 
-function getMonthsSinceHire(hireDate: string): number {
+export function getAccruedMonths(hireDate: string, departureDate?: string | null): number {
   const hire = new Date(hireDate);
   const now = new Date();
+  const departure = departureDate ? new Date(departureDate) : null;
 
-  let months = (now.getFullYear() - hire.getFullYear()) * 12 + (now.getMonth() - hire.getMonth());
+  // Accrual window ends at the departure date once it is in the past
+  const end = departure && departure < now ? departure : now;
 
-  if (now.getDate() < hire.getDate()) {
+  if (end < hire) return 0;
+
+  let months = (end.getFullYear() - hire.getFullYear()) * 12 + (end.getMonth() - hire.getMonth());
+
+  if (end.getDate() < hire.getDate()) {
     months = Math.max(0, months - 1);
   }
 

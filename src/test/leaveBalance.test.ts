@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeLeaveBalance, computeHolidayBalance, getAccruedMonths } from '@/lib/leaveBalance';
+import { computeLeaveBalance, computeHolidayBalance, computeAccruedPaid, computeAccruedHoliday, getAccruedMonths } from '@/lib/leaveBalance';
 
 // The accrual window must stop at departure_date: counters are frozen at
 // that date no matter how much time passes afterwards.
@@ -44,5 +44,27 @@ describe('balances with departure date', () => {
       monthly_holiday_accrual: 1.08,
     };
     expect(computeHolidayBalance(profile, 4)).toBeCloseTo(13 * 1.08 - 4);
+  });
+});
+
+describe('accrued totals (taken / accrued display)', () => {
+  it('computes total accrued paid leave', () => {
+    const profile = { hire_date: '2024-01-15', departure_date: '2025-01-15', monthly_accrual: 1.5 };
+    expect(computeAccruedPaid(profile)).toBeCloseTo(13 * 1.5);
+  });
+
+  it('computes total accrued public holidays', () => {
+    const profile = { hire_date: '2024-01-15', departure_date: '2025-01-15', monthly_holiday_accrual: 1.08 };
+    expect(computeAccruedHoliday(profile)).toBeCloseTo(13 * 1.08);
+  });
+
+  it('accrued minus balance equals taken', () => {
+    const profile = { hire_date: '2024-01-15', departure_date: '2025-01-15', monthly_accrual: 1.5 };
+    const taken = 10;
+    expect(computeAccruedPaid(profile) - computeLeaveBalance(profile, taken)).toBeCloseTo(taken);
+  });
+
+  it('returns 0 without a hire date', () => {
+    expect(computeAccruedPaid({ hire_date: null, departure_date: null, monthly_accrual: 1.5 })).toBe(0);
   });
 });

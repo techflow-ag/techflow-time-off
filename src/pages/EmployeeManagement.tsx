@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { UserPlus, Pencil, Trash2, KeyRound, Copy, Check } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
-import { computeLeaveBalance, computeHolidayBalance } from '@/lib/leaveBalance';
+import { computeLeaveBalance, computeHolidayBalance, computeAccruedPaid, computeAccruedHoliday } from '@/lib/leaveBalance';
 import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -449,8 +449,12 @@ export default function EmployeeManagement() {
               </thead>
               <tbody>
                 {profiles.map((p) => {
-                  const paidBalance = computeLeaveBalance(p, approvedPaidMap[p.id] || 0);
-                  const holidayBal = computeHolidayBalance(p, approvedHolidayMap[p.id] || 0);
+                  const paidTaken = approvedPaidMap[p.id] || 0;
+                  const holidayTaken = approvedHolidayMap[p.id] || 0;
+                  const paidBalance = computeLeaveBalance(p, paidTaken);
+                  const holidayBal = computeHolidayBalance(p, holidayTaken);
+                  const paidAccrued = computeAccruedPaid(p);
+                  const holidayAccrued = computeAccruedHoliday(p);
                   const totalTaken = totalLeaveTaken[p.id] || 0;
                   return (
                     <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => openDetail(p)}>
@@ -474,13 +478,28 @@ export default function EmployeeManagement() {
                           </span>
                         )}
                       </td>
-                      <td className={`px-4 py-3 font-medium ${paidBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>
-                        {paidBalance.toFixed(2)}
+                      <td className="px-4 py-3">
+                        <span className={`font-medium ${paidBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                          {paidBalance.toFixed(2)}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {paidTaken.toFixed(1)} / {paidAccrued.toFixed(1)} {language === 'fr' ? 'pris' : 'taken'}
+                        </span>
                       </td>
-                      <td className={`px-4 py-3 font-medium ${holidayBal < 0 ? 'text-destructive' : 'text-foreground'}`}>
-                        {holidayBal.toFixed(2)}
+                      <td className="px-4 py-3">
+                        <span className={`font-medium ${holidayBal < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                          {holidayBal.toFixed(2)}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {holidayTaken.toFixed(1)} / {holidayAccrued.toFixed(1)} {language === 'fr' ? 'pris' : 'taken'}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-foreground font-medium">{totalTaken.toFixed(1)}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-foreground font-medium">{totalTaken.toFixed(1)}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          / {(paidAccrued + holidayAccrued).toFixed(1)} {language === 'fr' ? 'cumulés' : 'accrued'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <Badge variant={p.is_active ? 'success' : 'secondary'}>
                           {p.is_active ? t('active') : t('inactive')}

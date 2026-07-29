@@ -36,6 +36,22 @@ export function computeHolidayBalance(
   return totalAccrued - approvedHolidayDays;
 }
 
+/** Total paid leave days accrued since hire (frozen at departure_date). */
+export function computeAccruedPaid(
+  profile: AccrualProfile & Pick<Tables<'profiles'>, 'monthly_accrual'>
+): number {
+  if (!profile.hire_date) return 0;
+  return getAccruedMonths(profile.hire_date, profile.departure_date) * (Number(profile.monthly_accrual) || 1.5);
+}
+
+/** Total public holiday days accrued since hire (frozen at departure_date). */
+export function computeAccruedHoliday(
+  profile: AccrualProfile & Pick<Tables<'profiles'>, 'monthly_holiday_accrual'>
+): number {
+  if (!profile.hire_date) return 0;
+  return getAccruedMonths(profile.hire_date, profile.departure_date) * (Number(profile.monthly_holiday_accrual) || 1.08);
+}
+
 export function getAccruedMonths(hireDate: string, departureDate?: string | null): number {
   const hire = new Date(hireDate);
   const now = new Date();

@@ -1,15 +1,25 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isRecoveryUrl } from '@/lib/recovery';
 import type { User } from '@supabase/supabase-js';
 import type { Tables } from '@/integrations/supabase/types';
 
 type AppRole = 'admin' | 'employee';
+
+// Captured synchronously at module load: supabase-js strips the token hash from
+// the URL while the app is still on its loading spinner, so reading
+// location.hash later (as AppRoutes used to do) misses the recovery flow.
+const initialPasswordRecovery =
+  typeof window !== 'undefined' &&
+  isRecoveryUrl(window.location.hash + window.location.search);
 
 interface AuthContextType {
   user: User | null;
   profile: Tables<'profiles'> | null;
   role: AppRole | null;
   loading: boolean;
+  passwordRecovery: boolean;
+  clearPasswordRecovery: () => void;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -21,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Tables<'profiles'> | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(initialPasswordRecovery);
 
   const fetchProfile = async (userId: string) => {
     const { data: profileData } = await supabase
@@ -42,6 +53,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setPasswordRecovery(true);
+        }
         const currentUser = session?.user ?? null;
         setUser(currentUser);
         if (currentUser) {
@@ -80,8 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRole(null);
   };
 
+  const clearPasswordRecovery = () => setPasswordRecovery(false);
+
   return (
-    <AuthContext.Provider value={{ user, profile, role, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, role, loading, passwordRecovery, clearPasswordRecovery, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

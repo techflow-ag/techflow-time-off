@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +13,12 @@ export default function SetPassword() {
   const { language } = useLanguage();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { clearPasswordRecovery } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [expired, setExpired] = useState(false);
 
   useEffect(() => {
     // Listen for the PASSWORD_RECOVERY or SIGNED_IN event from the invite link
@@ -32,8 +35,19 @@ export default function SetPassword() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Expired/invalid link: no session will ever arrive — don't spin forever
+    const timeout = setTimeout(() => setExpired(true), 8000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
+
+  const backToLogin = () => {
+    clearPasswordRecovery();
+    navigate('/', { replace: true });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,12 +66,29 @@ export default function SetPassword() {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: language === 'fr' ? 'Mot de passe défini avec succès' : 'Password set successfully' });
+      clearPasswordRecovery();
       navigate('/dashboard');
     }
     setLoading(false);
   };
 
   if (!ready) {
+    if (expired) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background p-4">
+          <div className="text-center space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {language === 'fr'
+                ? 'Ce lien est invalide ou a expiré. Veuillez demander un nouveau lien de réinitialisation.'
+                : 'This link is invalid or has expired. Please request a new reset link.'}
+            </p>
+            <Button variant="outline" onClick={backToLogin}>
+              {language === 'fr' ? 'Retour à la connexion' : 'Back to login'}
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center space-y-2">

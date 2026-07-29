@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import AppLayout from "@/components/layout/AppLayout";
@@ -20,12 +20,18 @@ import NotFound from "@/pages/NotFound";
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const { user, role, loading } = useAuth();
-  const location = useLocation();
+  const { user, role, loading, passwordRecovery } = useAuth();
 
-  // Check if this is an invite/recovery token flow
-  const hash = location.hash;
-  const isRecoveryFlow = hash.includes('type=recovery') || hash.includes('type=invite') || hash.includes('type=signup');
+  // Recovery/invite flow: the flag is captured before supabase-js strips the
+  // token hash from the URL, and survives until the password is actually set.
+  // Checked before `loading` so the user never sees a flash of the dashboard.
+  if (passwordRecovery) {
+    return (
+      <Routes>
+        <Route path="*" element={<SetPassword />} />
+      </Routes>
+    );
+  }
 
   if (loading) {
     return (
@@ -35,15 +41,6 @@ function AppRoutes() {
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
-    );
-  }
-
-  // If we have a recovery/invite token, show set-password page
-  if (isRecoveryFlow) {
-    return (
-      <Routes>
-        <Route path="*" element={<SetPassword />} />
-      </Routes>
     );
   }
 

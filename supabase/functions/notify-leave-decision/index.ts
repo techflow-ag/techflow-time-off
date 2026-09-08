@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const APP_URL = Deno.env.get("APP_URL") ?? "https://techflow-time-off.vercel.app";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -77,7 +79,7 @@ Deno.serve(async (req) => {
                   <tr><td style="padding: 8px 0; color: #6b7280;">Days</td><td style="padding: 8px 0; color: #111827; font-weight: 500;">${numberOfDays}</td></tr>
                   ${adminComment ? `<tr><td style="padding: 8px 0; color: #6b7280;">Comment</td><td style="padding: 8px 0; color: #111827;">${adminComment}</td></tr>` : ""}
                 </table>
-                <a href="https://techflow-time-off.lovable.app/my-leave" style="display: inline-block; background: #6366f1; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; margin-top: 8px;">View My Leave</a>
+                <a href="${APP_URL}/my-leave" style="display: inline-block; background: #6366f1; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; margin-top: 8px;">View My Leave</a>
               </div>
             </div>
           `,

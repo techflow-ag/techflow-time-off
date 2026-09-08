@@ -55,7 +55,18 @@ export default function Login() {
     });
 
     if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      // Supabase throttles password resets (60s per address, and a small
+      // project-wide hourly quota on the built-in mailer). Its raw English
+      // message is not something to show a French employee.
+      const rateLimited =
+        (error as { status?: number }).status === 429 ||
+        /rate limit|only request this after/i.test(error.message);
+      console.error('Password reset failed:', error);
+      toast({
+        title: 'Error',
+        description: rateLimited ? t('resetRateLimited') : t('resetError'),
+        variant: 'destructive',
+      });
     } else {
       toast({
         title: t('resetEmailSent'),

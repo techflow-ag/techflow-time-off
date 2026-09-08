@@ -93,6 +93,8 @@ export const translations = {
     backToLogin: "Back to login",
     resetEmailSent: "Reset email sent",
     resetEmailSentDesc: "Check your inbox for a link to reset your password",
+    resetRateLimited: "Too many requests. Please wait a minute before trying again.",
+    resetError: "The reset email could not be sent. Please try again in a moment.",
   },
   fr: {
     dashboard: "Tableau de bord",
@@ -182,6 +184,8 @@ export const translations = {
     backToLogin: "Retour à la connexion",
     resetEmailSent: "Email envoyé",
     resetEmailSentDesc: "Vérifiez votre boîte de réception pour un lien de réinitialisation",
+    resetRateLimited: "Trop de demandes. Patientez une minute avant de réessayer.",
+    resetError: "L'email de réinitialisation n'a pas pu être envoyé. Réessayez dans un instant.",
   },
 } as const;
 

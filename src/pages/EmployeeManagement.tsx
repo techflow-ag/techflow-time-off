@@ -70,7 +70,12 @@ export default function EmployeeManagement() {
 
   const fetchProfiles = async () => {
     const [profRes, leaveRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+      // Active employees first, deactivated ones at the bottom; newest first within each group
+      supabase
+        .from('profiles')
+        .select('*')
+        .order('is_active', { ascending: false })
+        .order('created_at', { ascending: false }),
       supabase.from('leave_requests').select('employee_id, number_of_days, type, status'),
     ]);
     setProfiles(profRes.data || []);
